@@ -90,8 +90,8 @@ const CryptoEngine = (() => {
       const textEncoder = new TextEncoder();
       const textBytes = textEncoder.encode(stateObj.text || '');
       
-      // Create payload: 2 bytes header + text bytes
-      const payload = new Uint8Array(2 + textBytes.length);
+      // Create payload: 3 bytes header + text bytes
+      const payload = new Uint8Array(3 + textBytes.length);
       
       // Byte 1: theme(3 bits, 0-7) | effect(2 bits, 0-3) | font(2 bits, 0-3) | glow(1 bit, 0-1)
       const effectMap = { 'floatUp': 0, 'fadeGlow': 1, 'typewriter': 2 };
@@ -105,8 +105,12 @@ const CryptoEngine = (() => {
       const sizeOffset = Math.max(0, Math.min(63, (stateObj.size || 28) - 16));
       payload[1] = (sizeOffset << 2) | alignVal;
       
+      // Byte 3: vignette(1 bit, 0-1) | remaining 7 bits reserved
+      const vignetteVal = stateObj.vignette ? 1 : 0;
+      payload[2] = vignetteVal;
+      
       // Set text bytes
-      payload.set(textBytes, 2);
+      payload.set(textBytes, 3);
       
       const xored = xorBytes(payload, KEY);
       return toBase64Url(xored);
@@ -115,7 +119,7 @@ const CryptoEngine = (() => {
       try {
         const bytes = fromBase64Url(hash);
         const xored = xorBytes(bytes, KEY);
-        if (xored.length < 2) return null;
+        if (xored.length < 3) return null;
         
         // Parse Byte 1
         const b1 = xored[0];
@@ -136,11 +140,15 @@ const CryptoEngine = (() => {
         const alignMap = ['left', 'center', 'right'];
         const align = alignMap[alignCode] || 'center';
         
+        // Parse Byte 3
+        const b3 = xored[2];
+        const vignette = (b3 & 0x01) === 1;
+        
         // Parse Text
-        const textBytes = xored.subarray(2);
+        const textBytes = xored.subarray(3);
         const text = new TextDecoder().decode(textBytes);
         
-        return { text, theme, effect, font, size, align, glow };
+        return { text, theme, effect, font, size, align, glow, vignette };
       } catch (e) {
         console.error('Decryption failed:', e);
         return null;
@@ -150,233 +158,326 @@ const CryptoEngine = (() => {
 })();
 
 /* ============================================================
-   ParticleSystem — Canvas-based ambient effects
+   BackgroundShader — Three.js WebGL GLSL Shader System with 2D Canvas Fallback
    ============================================================ */
-class ParticleSystem {
+class BackgroundShader {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.particles = [];
+    this.isFallback = false;
     this.animId = null;
-    this.themeId = null;
-    this.bgColors = [];
+    this.themeIndex = 0;
+
+    try {
+      this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: false, antialias: false });
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      this.scene = new THREE.Scene();
+      this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      
+      this.uniforms = {
+        uTime: { value: 0.0 },
+        uResolution: { value: new THREE.Vector2() },
+        uTheme: { value: 0 },
+        uVignette: { value: 1 }
+      };
+      
+      const geometry = new THREE.PlaneGeometry(2, 2);
+      const material = new THREE.ShaderMaterial({
+        vertexShader: this.getVertexShader(),
+        fragmentShader: this.getFragmentShader(),
+        uniforms: this.uniforms
+      });
+      
+      this.mesh = new THREE.Mesh(geometry, material);
+      this.scene.add(this.mesh);
+    } catch (e) {
+      console.warn("WebGL initialization failed, falling back to 2D Canvas gradient:", e);
+      this.isFallback = true;
+      this.ctx = this.canvas.getContext('2d');
+    }
   }
 
   resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.canvas.width = rect.width * dpr;
-    this.canvas.height = rect.height * dpr;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.w = rect.width;
-    this.h = rect.height;
+    const width = rect.width;
+    const height = rect.height;
+    
+    if (this.isFallback) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      this.canvas.width = width * dpr;
+      this.canvas.height = height * dpr;
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.w = width;
+      this.h = height;
+    } else {
+      if (this.canvas.width !== width || this.canvas.height !== height) {
+        this.renderer.setSize(width, height, false);
+        this.uniforms.uResolution.value.set(width, height);
+      }
+    }
   }
 
   setTheme(themeIndex) {
-    const theme = THEMES[themeIndex];
-    this.themeId = theme.particles;
-    this.bgColors = theme.bgGradient;
-    this.particles = [];
-    this._generateParticles();
-  }
-
-  _generateParticles() {
-    const count = this.themeId === 'stars' ? 120 :
-                  this.themeId === 'bubbles' ? 35 :
-                  this.themeId === 'aurora' ? 60 : 50;
-
-    for (let i = 0; i < count; i++) {
-      this.particles.push(this._createParticle());
+    this.themeIndex = themeIndex;
+    if (!this.isFallback) {
+      this.uniforms.uTheme.value = themeIndex;
     }
   }
 
-  _createParticle() {
-    const base = {
-      x: Math.random() * this.w,
-      y: Math.random() * this.h,
-      size: Math.random() * 2.5 + 0.5,
-      alpha: Math.random() * 0.7 + 0.3,
-      speed: Math.random() * 0.3 + 0.1,
-      phase: Math.random() * Math.PI * 2
-    };
-
-    switch (this.themeId) {
-      case 'stars':
-        base.twinkleSpeed = Math.random() * 0.02 + 0.005;
-        base.baseAlpha = base.alpha;
-        break;
-      case 'fireflies':
-        base.size = Math.random() * 3 + 1;
-        base.speed = Math.random() * 0.4 + 0.15;
-        base.wanderAngle = Math.random() * Math.PI * 2;
-        base.color = `hsl(${40 + Math.random() * 30}, 100%, ${65 + Math.random() * 20}%)`;
-        break;
-      case 'floatingLight':
-        base.size = Math.random() * 4 + 1;
-        base.speed = Math.random() * 0.5 + 0.2;
-        base.alpha = Math.random() * 0.4 + 0.1;
-        break;
-      case 'warmDust':
-        base.size = Math.random() * 2.5 + 0.5;
-        base.speed = Math.random() * 0.3 + 0.1;
-        base.color = `hsla(${20 + Math.random() * 30}, 80%, 75%, ${base.alpha})`;
-        break;
-      case 'aurora':
-        base.size = Math.random() * 3 + 1;
-        base.x = Math.random() * this.w;
-        base.waveAmp = Math.random() * 40 + 20;
-        base.waveFreq = Math.random() * 0.01 + 0.005;
-        base.hue = Math.random() * 60 + 100; // green-cyan range
-        break;
-      case 'bubbles':
-        base.size = Math.random() * 6 + 2;
-        base.speed = Math.random() * 0.4 + 0.2;
-        base.alpha = Math.random() * 0.25 + 0.05;
-        base.wobble = Math.random() * 2;
-        break;
+  setVignette(enabled) {
+    if (!this.isFallback) {
+      this.uniforms.uVignette.value = enabled ? 1 : 0;
     }
-    return base;
-  }
-
-  _drawBackground() {
-    const ctx = this.ctx;
-    const grad = ctx.createLinearGradient(0, 0, 0, this.h);
-    const colors = this.bgColors;
-    colors.forEach((c, i) => grad.addColorStop(i / (colors.length - 1), c));
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, this.w, this.h);
-  }
-
-  _updateAndDraw(time) {
-    const ctx = this.ctx;
-    const t = time * 0.001;
-
-    this.particles.forEach(p => {
-      switch (this.themeId) {
-        case 'stars':
-          p.alpha = p.baseAlpha * (0.5 + 0.5 * Math.sin(t * p.twinkleSpeed * 60 + p.phase));
-          ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-          break;
-
-        case 'fireflies':
-          p.wanderAngle += (Math.random() - 0.5) * 0.15;
-          p.x += Math.cos(p.wanderAngle) * p.speed;
-          p.y += Math.sin(p.wanderAngle) * p.speed;
-          if (p.x < -10) p.x = this.w + 10;
-          if (p.x > this.w + 10) p.x = -10;
-          if (p.y < -10) p.y = this.h + 10;
-          if (p.y > this.h + 10) p.y = -10;
-          const glowAlpha = 0.4 + 0.6 * Math.sin(t * 2 + p.phase);
-          ctx.save();
-          ctx.globalAlpha = glowAlpha;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 15;
-          ctx.fillStyle = p.color;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-          break;
-
-        case 'floatingLight':
-          p.y -= p.speed;
-          p.x += Math.sin(t + p.phase) * 0.3;
-          if (p.y < -10) { p.y = this.h + 10; p.x = Math.random() * this.w; }
-          ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-          break;
-
-        case 'warmDust':
-          p.y -= p.speed * 0.5;
-          p.x += Math.sin(t * 0.5 + p.phase) * 0.4;
-          if (p.y < -10) { p.y = this.h + 10; p.x = Math.random() * this.w; }
-          ctx.fillStyle = p.color;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-          break;
-
-        case 'aurora':
-          const wave = Math.sin(p.y * p.waveFreq + t * 0.5) * p.waveAmp;
-          const drawX = p.x + wave;
-          p.y -= p.speed * 0.3;
-          if (p.y < -20) { p.y = this.h + 20; p.x = Math.random() * this.w; }
-          const auroraHue = p.hue + Math.sin(t * 0.3 + p.phase) * 30;
-          ctx.save();
-          ctx.globalAlpha = 0.15 + 0.15 * Math.sin(t + p.phase);
-          ctx.shadowColor = `hsl(${auroraHue}, 80%, 60%)`;
-          ctx.shadowBlur = 20;
-          ctx.fillStyle = `hsl(${auroraHue}, 70%, 55%)`;
-          ctx.beginPath();
-          ctx.arc(drawX, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-          break;
-
-        case 'bubbles':
-          p.y -= p.speed;
-          p.x += Math.sin(t * p.wobble + p.phase) * 0.5;
-          if (p.y < -p.size * 2) { p.y = this.h + p.size * 2; p.x = Math.random() * this.w; }
-          ctx.save();
-          ctx.globalAlpha = p.alpha;
-          ctx.strokeStyle = 'rgba(150, 200, 255, 0.4)';
-          ctx.lineWidth = 0.5;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.stroke();
-          // Highlight
-          ctx.fillStyle = 'rgba(200, 230, 255, 0.15)';
-          ctx.beginPath();
-          ctx.arc(p.x - p.size * 0.3, p.y - p.size * 0.3, p.size * 0.3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-          break;
-      }
-    });
-
-    // Occasional shooting star for night sky
-    if (this.themeId === 'stars' && Math.random() < 0.002) {
-      this._drawShootingStar();
-    }
-  }
-
-  _drawShootingStar() {
-    const ctx = this.ctx;
-    const sx = Math.random() * this.w * 0.8;
-    const sy = Math.random() * this.h * 0.4;
-    const angle = Math.PI / 6 + Math.random() * Math.PI / 6;
-    const len = 60 + Math.random() * 40;
-
-    ctx.save();
-    const grad = ctx.createLinearGradient(sx, sy, sx + Math.cos(angle) * len, sy + Math.sin(angle) * len);
-    grad.addColorStop(0, 'rgba(255,255,255,0.8)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len);
-    ctx.stroke();
-    ctx.restore();
   }
 
   start() {
     this.resize();
     const loop = (time) => {
-      this._drawBackground();
-      this._updateAndDraw(time);
+      if (this.isFallback) {
+        this.renderFallback();
+      } else {
+        this.uniforms.uTime.value = time * 0.001;
+        this.renderer.render(this.scene, this.camera);
+      }
       this.animId = requestAnimationFrame(loop);
     };
     this.animId = requestAnimationFrame(loop);
   }
 
+  renderFallback() {
+    const ctx = this.ctx;
+    const theme = THEMES[this.themeIndex];
+    if (!theme) return;
+    
+    const grad = ctx.createLinearGradient(0, 0, 0, this.h);
+    const colors = theme.bgGradient;
+    colors.forEach((c, i) => grad.addColorStop(i / (colors.length - 1), c));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, this.w, this.h);
+  }
+
   stop() {
     if (this.animId) cancelAnimationFrame(this.animId);
+  }
+
+  getVertexShader() {
+    return `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `;
+  }
+
+  getFragmentShader() {
+    return `
+      uniform float uTime;
+      uniform vec2 uResolution;
+      uniform int uTheme;
+      uniform int uVignette;
+      varying vec2 vUv;
+      
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+                   mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+      }
+
+      float fbm(vec2 p) {
+        float v = 0.0;
+        float a = 0.5;
+        vec2 shift = vec2(100.0);
+        mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.50));
+        for (int i = 0; i < 5; ++i) {
+          v += a * noise(p);
+          p = rot * p * 2.0 + shift;
+          a *= 0.5;
+        }
+        return v;
+      }
+      
+      float starfield(vec2 uv) {
+        float n = hash(uv * 180.0);
+        float star = step(0.997, n) * hash(uv * 99.0) * 0.75;
+        return star;
+      }
+
+      float drawSingleMeteor(vec2 uv, float t, float seedOffset) {
+        float timeScale = (t + seedOffset) * 0.32; 
+        float cycle = floor(timeScale);
+        float localT = fract(timeScale);
+        
+        float h1 = hash(vec2(cycle, 123.45 + seedOffset));
+        float h2 = hash(vec2(cycle, 678.90 + seedOffset));
+        float h3 = hash(vec2(cycle, 345.67 + seedOffset));
+        
+        if (h1 < 0.15) return 0.0;
+        
+        float size = 0.001 + h1 * 0.0022;
+        float speed = 1.0 + (1.0 - h1) * 0.55; 
+        float brightness = 0.7 + h1 * 2.2;
+        float len = 0.22 + h1 * 0.22;
+        
+        // Parallel constant direction (gentle down-right sweep)
+        vec2 dir = normalize(vec2(1.2, -0.45));
+        
+        // Spawn points spread widely across both X and Y boundaries (low to high altitudes)
+        vec2 start = vec2(-0.55 + h2 * 1.4, 0.25 + h3 * 0.9);
+        
+        vec2 progress = start + dir * (localT * speed * 1.55);
+        
+        vec2 p = uv - progress;
+        float proj = dot(p, dir);
+        proj = clamp(proj, -len, 0.0);
+        vec2 nearest = progress + dir * proj;
+        float d = length(uv - nearest);
+        
+        float tail = smoothstep(-len, 0.0, proj);
+        float ray = smoothstep(size, 0.0, d) * tail;
+        
+        float timeMask = smoothstep(0.0, 0.12, localT) * smoothstep(0.85, 0.7, localT);
+        
+        return ray * timeMask * brightness;
+      }
+
+      float shootingStar(vec2 uv, float t) {
+        float m1 = drawSingleMeteor(uv, t, 0.0);
+        float m2 = drawSingleMeteor(uv, t, 33.7);
+        return m1 + m2;
+      }
+
+      vec3 starryNight(vec2 uv, float t) {
+        vec3 c1 = vec3(0.0, 0.05, 0.15);
+        vec3 c2 = vec3(0.0, 0.0, 0.02);
+        vec3 bg = mix(c1, c2, uv.y);
+        float milkyWay = fbm(uv * 3.0 + vec2(t * 0.01, 0.0));
+        bg += vec3(0.1, 0.1, 0.2) * smoothstep(0.4, 0.7, milkyWay) * (1.0 - abs(uv.y - 0.5)*2.0);
+        
+        float stars = starfield(uv);
+        float meteor = shootingStar(uv, t);
+        return bg + vec3(1.0) * stars + vec3(1.0, 0.95, 0.9) * meteor;
+      }
+
+      vec3 dawn(vec2 uv, float t) {
+        vec3 c1 = vec3(0.9, 0.4, 0.3);
+        vec3 c2 = vec3(0.2, 0.1, 0.4);
+        vec3 bg = mix(c1, c2, uv.y + fbm(uv * 2.0 + vec2(t * 0.05, 0.0)) * 0.2);
+        
+        vec2 grid = uv * 28.0;
+        vec2 gv = fract(grid) - 0.5;
+        vec2 ip = floor(grid);
+        float h = hash(ip);
+        
+        // Random wandering vector for each individual firefly
+        float angle = h * 6.2831;
+        float speed = 0.08 + h * 0.14;
+        vec2 flow = vec2(cos(angle + t * 0.75), sin(angle * 1.5 + t * 0.5)) * speed * 2.0;
+        vec2 deformedGv = gv - flow;
+        
+        float d = length(deformedGv);
+        float glow = smoothstep(0.22, 0.0, d);
+        float dots = step(0.982, h) * glow * (sin(t * 2.0 + h * 20.0) * 0.5 + 0.5);
+        return bg + vec3(1.0, 0.85, 0.4) * dots * 1.5;
+      }
+
+      vec3 morning(vec2 uv, float t) {
+        vec3 c1 = vec3(0.8, 0.95, 1.0);
+        vec3 c2 = vec3(0.3, 0.6, 0.9);
+        vec3 bg = mix(c1, c2, uv.y);
+        float clouds = fbm(uv * 3.0 - vec2(t * 0.05, 0.0));
+        return mix(bg, vec3(1.0), smoothstep(0.4, 0.8, clouds));
+      }
+
+      vec3 sunset(vec2 uv, float t) {
+        vec3 c1 = vec3(1.0, 0.5, 0.1);
+        vec3 c2 = vec3(0.4, 0.1, 0.3);
+        vec3 bg = mix(c1, c2, uv.y + fbm(uv * 2.0 - vec2(t * 0.02, 0.0)) * 0.1);
+        float clouds = fbm(uv * 4.0 - vec2(t * 0.1, 0.0));
+        return mix(bg, vec3(1.0, 0.7, 0.4), smoothstep(0.5, 0.9, clouds));
+      }
+
+      vec3 aurora(vec2 uv, float t) {
+        vec3 bg = mix(vec3(0.0, 0.05, 0.1), vec3(0.0, 0.0, 0.0), uv.y);
+        bg += vec3(1.0) * starfield(uv);
+        
+        vec2 p = uv * vec2(3.0, 1.0);
+        float n = fbm(p + vec2(t * 0.2, t * 0.1));
+        float n2 = fbm(p + vec2(-t * 0.15, t * 0.2) + vec2(n * 2.0));
+        
+        vec3 col1 = vec3(0.0, 1.0, 0.5);
+        vec3 col2 = vec3(0.2, 0.4, 1.0);
+        
+        float mask = smoothstep(0.0, 0.8, 1.0 - abs(uv.y - 0.6 + n * 0.2));
+        vec3 aur = mix(col1, col2, n) * n2 * mask * 1.5;
+        
+        return bg + aur;
+      }
+
+      vec3 deepSea(vec2 uv, float t) {
+        vec3 c1 = vec3(0.0, 0.1, 0.3);
+        vec3 c2 = vec3(0.0, 0.02, 0.1);
+        vec3 bg = mix(c1, c2, uv.y);
+        
+        vec2 p = uv * 4.0;
+        p.x += sin(p.y * 1.5 + t) * 0.4;
+        float water = fbm(p + vec2(0.0, t * 0.3));
+        bg += vec3(0.08, 0.25, 0.35) * water * 0.6;
+        
+        vec2 buv = uv;
+        buv.y -= t * 0.18;
+        
+        vec2 grid = buv * 16.0;
+        vec2 gv = fract(grid) - 0.5;
+        vec2 id = floor(grid);
+        float h = hash(id);
+        
+        float wobbleTime = t * 4.0 + h * 50.0;
+        gv.x += sin(wobbleTime) * 0.15;
+        
+        float r = 0.03 + h * 0.06;
+        
+        float squish = 1.0 + cos(wobbleTime * 2.0) * 0.1;
+        vec2 deformedGv = gv * vec2(1.0 / squish, squish);
+        float d = length(deformedGv);
+        
+        float ring = smoothstep(r, r - 0.012, d) * smoothstep(r - 0.04, r - 0.03, d);
+        float interior = smoothstep(r, 0.0, d) * 0.12;
+        
+        vec2 highlightPos = vec2(-r * 0.35, r * 0.35);
+        float highlight = smoothstep(r * 0.35, 0.0, length(deformedGv - highlightPos)) * 0.8;
+        
+        float innerGlow = smoothstep(r - 0.03, r - 0.015, d) * smoothstep(r, r - 0.03, d) * 0.3;
+        
+        float bubble = (ring + interior + highlight + innerGlow) * step(0.965, h);
+        
+        return bg + vec3(0.65, 0.88, 1.0) * bubble * 0.35;
+      }
+
+      void main() {
+        vec2 uv = gl_FragCoord.xy / uResolution.xy;
+        vec3 color = vec3(0.0);
+        
+        if (uTheme == 0) color = starryNight(uv, uTime);
+        else if (uTheme == 1) color = dawn(uv, uTime);
+        else if (uTheme == 2) color = morning(uv, uTime);
+        else if (uTheme == 3) color = sunset(uv, uTime);
+        else if (uTheme == 4) color = aurora(uv, uTime);
+        else if (uTheme == 5) color = deepSea(uv, uTime);
+        
+        if (uVignette == 1) {
+          float dist = distance(uv, vec2(0.5));
+          color *= smoothstep(0.8, 0.2, dist);
+        }
+        
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
   }
 }
 
@@ -417,11 +518,12 @@ function initViewerMode(state) {
   // Apply entrance
   applyEntrance(textEl, state.effect || 'floatUp', state.text || '');
 
-  // Start particles
-  const ps = new ParticleSystem(canvas);
+  // Start background shader
+  const ps = new BackgroundShader(canvas);
   ps.setTheme(state.theme || 0);
+  ps.setVignette(state.vignette !== undefined ? state.vignette : true);
   ps.start();
-  window.addEventListener('resize', () => { ps.resize(); ps.particles = []; ps._generateParticles(); });
+  window.addEventListener('resize', () => { ps.resize(); });
 }
 
 /* ---------- Editor Mode ---------- */
@@ -436,6 +538,7 @@ function initEditorMode() {
   const alignBtns = document.querySelectorAll('.align-btn');
   const effectBtns = document.querySelectorAll('.effect-btn');
   const glowToggle = document.getElementById('text-glow');
+  const vignetteToggle = document.getElementById('bg-vignette');
   const previewText = document.getElementById('preview-text');
   const shareBtn = document.getElementById('share-btn');
   const shareResult = document.getElementById('share-result');
@@ -443,7 +546,7 @@ function initEditorMode() {
   const copyBtn = document.getElementById('copy-btn');
 
   const previewCanvas = document.getElementById('preview-canvas');
-  const ps = new ParticleSystem(previewCanvas);
+  const ps = new BackgroundShader(previewCanvas);
 
   // State
   let activeTheme = 0;
@@ -477,7 +580,7 @@ function initEditorMode() {
   // Init preview canvas
   ps.setTheme(0);
   ps.start();
-  window.addEventListener('resize', () => { ps.resize(); ps.particles = []; ps._generateParticles(); });
+  window.addEventListener('resize', () => { ps.resize(); });
 
   // ---- Text input live sync ----
   charCount.textContent = textInput.value.length;
@@ -534,6 +637,13 @@ function initEditorMode() {
   // init glow
   previewText.classList.toggle('glow', glowToggle.checked);
 
+  // ---- Vignette toggle ----
+  vignetteToggle.addEventListener('change', () => {
+    ps.setVignette(vignetteToggle.checked);
+  });
+  // init vignette
+  ps.setVignette(vignetteToggle.checked);
+
   // ---- Share link generation ----
   shareBtn.addEventListener('click', () => {
     const state = {
@@ -543,7 +653,8 @@ function initEditorMode() {
       font: parseInt(fontSelect.value),
       size: parseInt(fontSizeInput.value),
       align: activeAlign,
-      glow: glowToggle.checked
+      glow: glowToggle.checked,
+      vignette: vignetteToggle.checked
     };
 
     const encrypted = CryptoEngine.encrypt(state);
