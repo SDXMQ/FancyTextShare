@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FancyTextShare - 감성 텍스트 카드 공유</title>
+  <meta name="description" content="텍스트를 아름다운 밤하늘, 노을, 오로라 위에 풍선처럼 띄워 공유하세요. 서버 없이 링크 하나로 감성 전달.">
+  <meta property="og:title" content="FancyTextShare - 감성 텍스트 카드 공유">
+  <meta property="og:description" content="텍스트에 감성을 입혀 공유하세요.">
+  <meta property="og:type" content="website">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== EDITOR VIEW ===== -->
+  <div id="editor-view">
+    <div class="background-decorations">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+
+    <div class="app-container">
+      <header class="app-header">
+        <div class="logo">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <h1>FancyText<span>Share</span></h1>
+        </div>
+        <p class="subtitle">텍스트에 감성을 입혀 링크 하나로 공유하세요.</p>
+      </header>
+
+      <main class="app-content">
+        <!-- Left: Controls -->
+        <section class="control-panel">
+          <!-- Text Input -->
+          <div class="panel-section">
+            <h2><i class="fa-solid fa-pen-nib"></i> 텍스트 입력</h2>
+            <textarea id="text-input" placeholder="공유하고 싶은 문장을 입력하세요..." maxlength="300">밤하늘에 띄우는 나의 마음</textarea>
+            <div class="char-counter"><span id="current-char-count">14</span> / 300</div>
+          </div>
+
+          <!-- Background Theme -->
+          <div class="panel-section">
+            <h2><i class="fa-solid fa-palette"></i> 배경 테마</h2>
+            <div class="theme-grid" id="theme-selector"></div>
+          </div>
+
+          <!-- Text Effect -->
+          <div class="panel-section">
+            <h2><i class="fa-solid fa-wand-sparkles"></i> 등장 효과</h2>
+            <div class="effect-grid" id="effect-selector">
+              <button type="button" class="effect-btn active" data-effect="floatUp">
+                <i class="fa-solid fa-arrow-up"></i>
+                <span>떠오르기</span>
+              </button>
+              <button type="button" class="effect-btn" data-effect="fadeGlow">
+                <i class="fa-solid fa-sun"></i>
+                <span>빛나며</span>
+              </button>
+              <button type="button" class="effect-btn" data-effect="typewriter">
+                <i class="fa-solid fa-keyboard"></i>
+                <span>타이핑</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Typography -->
+          <div class="panel-section">
+            <h2><i class="fa-solid fa-font"></i> 스타일</h2>
+            <div class="control-row">
+              <div class="control-group">
+                <label for="font-family">글꼴</label>
+                <select id="font-family">
+                  <option value="0">Outfit (모던)</option>
+                  <option value="1">Playfair (감성)</option>
+                  <option value="2">Fira Code (테크)</option>
+                </select>
+              </div>
+              <div class="control-group">
+                <label>정렬</label>
+                <div class="align-buttons">
+                  <button type="button" class="align-btn" data-align="left"><i class="fa-solid fa-align-left"></i></button>
+                  <button type="button" class="align-btn active" data-align="center"><i class="fa-solid fa-align-center"></i></button>
+                  <button type="button" class="align-btn" data-align="right"><i class="fa-solid fa-align-right"></i></button>
+                </div>
+              </div>
+            </div>
+            <div class="control-row">
+              <div class="control-group range-group">
+                <div class="range-header">
+                  <label for="font-size">글자 크기</label>
+                  <span id="font-size-val">28px</span>
+                </div>
+                <input type="range" id="font-size" min="16" max="56" value="28">
+              </div>
+            </div>
+            <div class="control-row">
+              <div class="control-group">
+                <label class="toggle-label">
+                  <input type="checkbox" id="text-glow" checked>
+                  <span class="toggle-switch"></span>
+                  <span>글자 발광 효과</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right: Preview -->
+        <section class="preview-panel">
+          <div class="preview-container" id="preview-container">
+            <canvas id="preview-canvas"></canvas>
+            <div class="preview-text-layer">
+              <div class="floating-text" id="preview-text">밤하늘에 띄우는 나의 마음</div>
+            </div>
+            <div class="preview-watermark">FancyTextShare</div>
+          </div>
+
+          <div class="actions-panel">
+            <button id="share-btn" class="btn btn-primary">
+              <i class="fa-solid fa-link"></i> 공유 링크 생성
+            </button>
+          </div>
+
+          <!-- Share Result (hidden until link is generated) -->
+          <div id="share-result" class="share-result hidden">
+            <div class="share-url-box">
+              <input type="text" id="share-url" readonly>
+              <button id="copy-btn" class="btn btn-copy">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+            <p class="share-hint">이 링크를 상대방에게 보내면 당신이 만든 그대로 보입니다!</p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="app-footer">
+        <p>&copy; 2026 FancyTextShare &mdash; 서버 없이 링크로 감성 공유</p>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ===== VIEWER VIEW (shared link destination) ===== -->
+  <div id="viewer-view" class="hidden">
+    <canvas id="viewer-canvas"></canvas>
+    <div class="viewer-text-layer">
+      <div class="floating-text viewer-floating-text" id="viewer-text"></div>
+    </div>
+    <div class="viewer-watermark">FancyTextShare</div>
+    <a href="./" class="viewer-create-btn">
+      <i class="fa-solid fa-plus"></i> 나도 만들기
+    </a>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
