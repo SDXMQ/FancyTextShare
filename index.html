@@ -18,6 +18,14 @@
 </head>
 <body>
 
+  <!-- Language Selector (Fixed Top Right) -->
+  <div class="lang-selector">
+    <button type="button" id="lang-btn">
+      <i class="fa-solid fa-globe"></i>
+      <span id="lang-text">KO</span>
+    </button>
+  </div>
+
   <!-- ===== EDITOR VIEW ===== -->
   <div id="editor-view">
     <div class="background-decorations">
@@ -32,7 +40,7 @@
           <i class="fa-solid fa-wand-magic-sparkles"></i>
           <h1>FancyText<span>Share</span></h1>
         </div>
-        <p class="subtitle">텍스트에 감성을 입혀 링크 하나로 공유하세요.</p>
+        <p class="subtitle" data-i18n="subtitle">텍스트에 감성을 입혀 링크 하나로 공유하세요.</p>
       </header>
 
       <main class="app-content">
@@ -40,50 +48,50 @@
         <section class="control-panel">
           <!-- Text Input -->
           <div class="panel-section">
-            <h2><i class="fa-solid fa-pen-nib"></i> 텍스트 입력</h2>
-            <textarea id="text-input" placeholder="공유하고 싶은 문장을 입력하세요..." maxlength="300">밤하늘에 띄우는 나의 마음</textarea>
+            <h2 data-i18n="section-text"><i class="fa-solid fa-pen-nib"></i> 텍스트 입력</h2>
+            <textarea id="text-input" data-i18n-placeholder="input-placeholder" placeholder="공유하고 싶은 문장을 입력하세요..." maxlength="300">밤하늘에 띄우는 나의 마음</textarea>
             <div class="char-counter"><span id="current-char-count">14</span> / 300</div>
           </div>
 
           <!-- Background Theme -->
           <div class="panel-section">
-            <h2><i class="fa-solid fa-palette"></i> 배경 테마</h2>
+            <h2 data-i18n="section-theme"><i class="fa-solid fa-palette"></i> 배경 테마</h2>
             <div class="theme-grid" id="theme-selector"></div>
           </div>
 
           <!-- Text Effect -->
           <div class="panel-section">
-            <h2><i class="fa-solid fa-wand-sparkles"></i> 등장 효과</h2>
+            <h2 data-i18n="section-effect"><i class="fa-solid fa-wand-sparkles"></i> 등장 효과</h2>
             <div class="effect-grid" id="effect-selector">
               <button type="button" class="effect-btn active" data-effect="floatUp">
                 <i class="fa-solid fa-arrow-up"></i>
-                <span>떠오르기</span>
+                <span data-i18n="effect-float">떠오르기</span>
               </button>
               <button type="button" class="effect-btn" data-effect="fadeGlow">
                 <i class="fa-solid fa-sun"></i>
-                <span>빛나며</span>
+                <span data-i18n="effect-glow">빛나며</span>
               </button>
               <button type="button" class="effect-btn" data-effect="typewriter">
                 <i class="fa-solid fa-keyboard"></i>
-                <span>타이핑</span>
+                <span data-i18n="effect-type">타이핑</span>
               </button>
             </div>
           </div>
 
           <!-- Typography -->
           <div class="panel-section">
-            <h2><i class="fa-solid fa-font"></i> 스타일</h2>
+            <h2 data-i18n="section-style"><i class="fa-solid fa-font"></i> 스타일</h2>
             <div class="control-row">
               <div class="control-group">
-                <label for="font-family">글꼴</label>
+                <label for="font-family" data-i18n="label-font">글꼴</label>
                 <select id="font-family">
-                  <option value="0">Outfit (모던)</option>
-                  <option value="1">Playfair (감성)</option>
-                  <option value="2">Fira Code (테크)</option>
+                  <option value="0" data-i18n="font-modern">Outfit (모던)</option>
+                  <option value="1" data-i18n="font-serif">Playfair (감성)</option>
+                  <option value="2" data-i18n="font-mono">Fira Code (테크)</option>
                 </select>
               </div>
               <div class="control-group">
-                <label>정렬</label>
+                <label data-i18n="label-align">정렬</label>
                 <div class="align-buttons">
                   <button type="button" class="align-btn" data-align="left"><i class="fa-solid fa-align-left"></i></button>
                   <button type="button" class="align-btn active" data-align="center"><i class="fa-solid fa-align-center"></i></button>
@@ -94,7 +102,7 @@
             <div class="control-row">
               <div class="control-group range-group">
                 <div class="range-header">
-                  <label for="font-size">글자 크기</label>
+                  <label for="font-size" data-i18n="label-size">글자 크기</label>
                   <span id="font-size-val">28px</span>
                 </div>
                 <input type="range" id="font-size" min="16" max="56" value="28">
@@ -105,7 +113,7 @@
                 <label class="toggle-label">
                   <input type="checkbox" id="text-glow" checked>
                   <span class="toggle-switch"></span>
-                  <span>글자 발광 효과</span>
+                  <span data-i18n="label-glow">글자 발광 효과</span>
                 </label>
               </div>
             </div>
@@ -114,7 +122,7 @@
                 <label class="toggle-label">
                   <input type="checkbox" id="bg-vignette" checked>
                   <span class="toggle-switch"></span>
-                  <span>배경 비네트 효과</span>
+                  <span data-i18n="label-vignette">배경 비네트 효과</span>
                 </label>
               </div>
             </div>
@@ -133,7 +141,7 @@
 
           <div class="actions-panel">
             <button id="share-btn" class="btn btn-primary">
-              <i class="fa-solid fa-link"></i> 공유 링크 생성
+              <i class="fa-solid fa-link"></i> <span data-i18n="btn-share">공유 링크 생성</span>
             </button>
           </div>
 
@@ -145,14 +153,14 @@
                 <i class="fa-solid fa-copy"></i>
               </button>
             </div>
-            <p class="share-hint">이 링크를 상대방에게 보내면 당신이 만든 그대로 보입니다!</p>
+            <p class="share-hint" data-i18n="share-hint">이 링크를 상대방에게 보내면 당신이 만든 그대로 보입니다!</p>
           </div>
         </section>
       </main>
 
       <footer class="app-footer">
-        <p>&copy; 2026 FancyTextShare &mdash; 서버 없이 링크로 감성 공유</p>
-        <p class="cache-notice"><i class="fa-solid fa-circle-info"></i> 업데이트가 반영되지 않거나 작동하지 않으면 <strong>강력 새로고침 (Ctrl+F5 / Cmd+Shift+R)</strong>을 해주세요.</p>
+        <p>&copy; 2026 FancyTextShare &mdash; <span data-i18n="footer-tagline">서버 없이 링크로 감성 공유</span></p>
+        <p class="cache-notice"><i class="fa-solid fa-circle-info"></i> <span data-i18n="cache-notice">업데이트가 반영되지 않거나 작동하지 않으면 강력 새로고침 (Ctrl+F5 / Cmd+Shift+R)을 해주세요.</span></p>
       </footer>
     </div>
   </div>

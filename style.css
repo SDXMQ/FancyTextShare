@@ -390,3 +390,38 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   font-size: 0.8rem;
 }
 
+/* Language Selector */
+.lang-selector {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+}
+.lang-selector button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-main);
+  padding: 0.55rem 0.95rem;
+  border-radius: 50px;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.lang-selector button:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-2px);
+}
+.lang-selector button i {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+

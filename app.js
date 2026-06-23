@@ -13,48 +13,162 @@ const FONT_MAP = [
 // ---- Theme Definitions ----
 const THEMES = [
   {
-    id: 'starryNight', label: '밤하늘',
+    id: 'starryNight',
+    label: { ko: '밤하늘', en: 'Starry Night' },
     bgGradient: ['#070b1a', '#0f1b3d', '#162050'],
     previewGradient: 'linear-gradient(135deg, #070b1a, #0f1b3d, #162050)',
     particles: 'stars',
-    defaultText: '밤하늘에 띄우는 나의 마음'
+    defaultText: { ko: '밤하늘에 띄우는 나의 마음', en: 'My heart floating in the starry night' }
   },
   {
-    id: 'dawn', label: '새벽',
+    id: 'dawn',
+    label: { ko: '새벽', en: 'Dawn' },
     bgGradient: ['#1a0533', '#3d1259', '#c0392b', '#f39c12'],
     previewGradient: 'linear-gradient(to top, #f39c12, #c0392b, #3d1259, #1a0533)',
     particles: 'fireflies',
-    defaultText: '새벽하늘을 수놓은 아련한 고백'
+    defaultText: { ko: '새벽하늘을 수놓은 아련한 고백', en: 'A vague confession embroiderying the dawn sky' }
   },
   {
-    id: 'morning', label: '아침',
+    id: 'morning',
+    label: { ko: '아침', en: 'Morning' },
     bgGradient: ['#4facfe', '#00f2fe'],
     previewGradient: 'linear-gradient(135deg, #4facfe, #00f2fe)',
     particles: 'floatingLight',
-    defaultText: '싱그러운 아침 햇살 아래 첫인사'
+    defaultText: { ko: '싱그러운 아침 햇살 아래 첫인사', en: 'First greeting under the fresh morning sun' }
   },
   {
-    id: 'sunset', label: '노을',
+    id: 'sunset',
+    label: { ko: '노을', en: 'Sunset' },
     bgGradient: ['#fa709a', '#fee140', '#f7797d'],
     previewGradient: 'linear-gradient(to top, #fee140, #fa709a, #f7797d)',
     particles: 'warmDust',
-    defaultText: '붉게 물든 저녁 노을빛을 담아'
+    defaultText: { ko: '붉게 물든 저녁 노을빛을 담아', en: 'Holding the red sunset glow of the evening' }
   },
   {
-    id: 'aurora', label: '오로라',
+    id: 'aurora',
+    label: { ko: '오로라', en: 'Aurora' },
     bgGradient: ['#0f0c29', '#302b63', '#24243e'],
     previewGradient: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
     particles: 'aurora',
-    defaultText: '춤추는 오로라 아래 그린 기적'
+    defaultText: { ko: '춤추는 오로라 아래 그린 기적', en: 'A miracle drawn under the dancing aurora' }
   },
   {
-    id: 'deepSea', label: '심해',
+    id: 'deepSea',
+    label: { ko: '심해', en: 'Deep Sea' },
     bgGradient: ['#000428', '#004e92'],
     previewGradient: 'linear-gradient(135deg, #000428, #004e92)',
     particles: 'bubbles',
-    defaultText: '깊은 심해 속 고요히 흐르는 생각'
+    defaultText: { ko: '깊은 심해 속 고요히 흐르는 생각', en: 'Thoughts quietly flowing in the deep sea' }
   }
 ];
+
+/* ============================================================
+   i18n — Language Translation Settings
+   ============================================================ */
+const I18N_DICTS = {
+  ko: {
+    'subtitle': '텍스트에 감성을 입혀 링크 하나로 공유하세요.',
+    'section-text': '텍스트 입력',
+    'input-placeholder': '공유하고 싶은 문장을 입력하세요...',
+    'section-theme': '배경 테마',
+    'section-effect': '등장 효과',
+    'effect-float': '떠오르기',
+    'effect-glow': '빛나며',
+    'effect-type': '타이핑',
+    'section-style': '스타일',
+    'label-font': '글꼴',
+    'font-modern': 'Outfit (모던)',
+    'font-serif': 'Playfair (감성)',
+    'font-mono': 'Fira Code (테크)',
+    'label-align': '정렬',
+    'label-size': '글자 크기',
+    'label-glow': '글자 발광 효과',
+    'label-vignette': '배경 비네트 효과',
+    'btn-share': '공유 링크 생성',
+    'share-hint': '이 링크를 상대방에게 보내면 당신이 만든 그대로 보입니다!',
+    'footer-tagline': '서버 없이 링크로 감성 공유',
+    'cache-notice': '업데이트가 반영되지 않거나 작동하지 않으면 강력 새로고침 (Ctrl+F5 / Cmd+Shift+R)을 해주세요.',
+    'btn-create-mine': '나도 만들기',
+    'placeholder-text': '텍스트를 입력해주세요...'
+  },
+  en: {
+    'subtitle': 'Add emotion to your text and share it with a single link.',
+    'section-text': 'Text Input',
+    'input-placeholder': 'Enter the sentence you want to share...',
+    'section-theme': 'Background Theme',
+    'section-effect': 'Entrance Effect',
+    'effect-float': 'Float Up',
+    'effect-glow': 'Fade Glow',
+    'effect-type': 'Typewriter',
+    'section-style': 'Style',
+    'label-font': 'Font Family',
+    'font-modern': 'Outfit (Modern)',
+    'font-serif': 'Playfair (Serif)',
+    'font-mono': 'Fira Code (Tech)',
+    'label-align': 'Alignment',
+    'label-size': 'Font Size',
+    'label-glow': 'Text Glow Effect',
+    'label-vignette': 'Vignette Effect',
+    'btn-share': 'Generate Share Link',
+    'share-hint': 'Send this link to someone and they will see exactly what you created!',
+    'footer-tagline': 'Share emotions with a serverless link',
+    'cache-notice': 'If it does not work or update, please do a hard refresh (Ctrl+F5 / Cmd+Shift+R).',
+    'btn-create-mine': 'Create My Own',
+    'placeholder-text': 'Please enter some text...'
+  }
+};
+
+let currentLang = 'ko';
+
+function updateLanguage(lang) {
+  currentLang = lang;
+  const langText = document.getElementById('lang-text');
+  if (langText) langText.textContent = lang.toUpperCase();
+  
+  // Translate simple elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (I18N_DICTS[lang][key]) {
+      const icon = el.querySelector('i');
+      if (icon) {
+        el.innerHTML = '';
+        el.appendChild(icon);
+        el.appendChild(document.createTextNode(' ' + I18N_DICTS[lang][key]));
+      } else {
+        el.textContent = I18N_DICTS[lang][key];
+      }
+    }
+  });
+
+  // Translate placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (I18N_DICTS[lang][key]) {
+      el.setAttribute('placeholder', I18N_DICTS[lang][key]);
+    }
+  });
+
+  // Update theme buttons if selector is present (Editor mode)
+  const themeSelector = document.getElementById('theme-selector');
+  if (themeSelector) {
+    const activeThemeIndex = parseInt(themeSelector.dataset.activeTheme || 0);
+    themeSelector.innerHTML = '';
+    THEMES.forEach((theme, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `theme-btn ${i === activeThemeIndex ? 'active' : ''}`;
+      btn.style.background = theme.previewGradient;
+      btn.dataset.label = theme.label[lang];
+      btn.addEventListener('click', () => {
+        themeSelector.querySelector('.active')?.classList.remove('active');
+        btn.classList.add('active');
+        themeSelector.dataset.activeTheme = i;
+        if (window.appSetTheme) window.appSetTheme(i);
+      });
+      themeSelector.appendChild(btn);
+    });
+  }
+}
 
 /* ============================================================
    CryptoEngine — XOR + Base64URL (lightweight, no library)
@@ -105,9 +219,10 @@ const CryptoEngine = (() => {
       const sizeOffset = Math.max(0, Math.min(63, (stateObj.size || 28) - 16));
       payload[1] = (sizeOffset << 2) | alignVal;
       
-      // Byte 3: vignette(1 bit, 0-1) | remaining 7 bits reserved
+      // Byte 3: vignette(1 bit, 0-1) | lang(1 bit, 0-1: 0=ko, 1=en) | remaining 6 bits reserved
       const vignetteVal = stateObj.vignette ? 1 : 0;
-      payload[2] = vignetteVal;
+      const langVal = stateObj.lang === 'en' ? 1 : 0;
+      payload[2] = (vignetteVal & 0x01) | ((langVal & 0x01) << 1);
       
       // Set text bytes
       payload.set(textBytes, 3);
@@ -143,12 +258,13 @@ const CryptoEngine = (() => {
         // Parse Byte 3
         const b3 = xored[2];
         const vignette = (b3 & 0x01) === 1;
+        const lang = ((b3 >> 1) & 0x01) === 1 ? 'en' : 'ko';
         
         // Parse Text
         const textBytes = xored.subarray(3);
         const text = new TextDecoder().decode(textBytes);
         
-        return { text, theme, effect, font, size, align, glow, vignette };
+        return { text, theme, effect, font, size, align, glow, vignette, lang };
       } catch (e) {
         console.error('Decryption failed:', e);
         return null;
@@ -505,6 +621,13 @@ function initViewerMode(state) {
   const viewerView = document.getElementById('viewer-view');
   viewerView.classList.remove('hidden');
 
+  // Apply language if shared, default to ko
+  const sharedLang = state.lang || 'ko';
+  updateLanguage(sharedLang);
+  
+  // Hide language toggle button in fullscreen viewer
+  document.querySelector('.lang-selector')?.classList.add('hidden');
+
   const canvas = document.getElementById('viewer-canvas');
   const textEl = document.getElementById('viewer-text');
 
@@ -554,42 +677,52 @@ function initEditorMode() {
   let activeAlign = 'center';
   let isUserModified = false;
 
-  // ---- Theme buttons ----
-  THEMES.forEach((theme, i) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `theme-btn ${i === 0 ? 'active' : ''}`;
-    btn.style.background = theme.previewGradient;
-    btn.dataset.label = theme.label;
-    btn.addEventListener('click', () => {
-      themeSelector.querySelector('.active')?.classList.remove('active');
-      btn.classList.add('active');
-      activeTheme = i;
-      ps.setTheme(i);
+  // Expose theme changing behavior to i18n renderer
+  window.appSetTheme = (i) => {
+    themeSelector.dataset.activeTheme = i;
+    themeSelector.querySelector('.active')?.classList.remove('active');
+    themeSelector.querySelectorAll('.theme-btn')[i]?.classList.add('active');
+    activeTheme = i;
+    ps.setTheme(i);
+ 
+    if (!isUserModified) {
+      textInput.value = THEMES[i].defaultText[currentLang];
+      syncPreview();
+      replayEntrance(previewText, activeEffect, textInput.value);
+    }
+  };
 
-      // If user hasn't edited the text, apply the new theme's default text
-      if (!isUserModified) {
-        textInput.value = theme.defaultText;
-        syncPreview();
-        replayEntrance(previewText, activeEffect, textInput.value);
-      }
-    });
-    themeSelector.appendChild(btn);
+  // ---- Language Selector Button ----
+  const langBtn = document.getElementById('lang-btn');
+  langBtn.addEventListener('click', () => {
+    const nextLang = currentLang === 'ko' ? 'en' : 'ko';
+    updateLanguage(nextLang);
+    
+    // Update default text if not modified
+    if (!isUserModified) {
+      textInput.value = THEMES[activeTheme].defaultText[nextLang];
+      syncPreview();
+      replayEntrance(previewText, activeEffect, textInput.value);
+    } else if (textInput.value === '') {
+      syncPreview();
+    }
   });
 
+  // Init default language to Korean
+  updateLanguage('ko');
+ 
   // Init preview canvas
   ps.setTheme(0);
   ps.start();
   window.addEventListener('resize', () => { ps.resize(); });
-
+ 
   // ---- Text input live sync ----
   charCount.textContent = textInput.value.length;
   function syncPreview() {
-    previewText.textContent = textInput.value || '텍스트를 입력해주세요...';
+    previewText.textContent = textInput.value || I18N_DICTS[currentLang]['placeholder-text'];
     charCount.textContent = textInput.value.length;
   }
   textInput.addEventListener('input', () => {
-    // If text is cleared, reset modification flag to allow default theme texts again
     if (textInput.value.trim() === '') {
       isUserModified = false;
     } else {
@@ -597,18 +730,18 @@ function initEditorMode() {
     }
     syncPreview();
   });
-
+ 
   // ---- Font family ----
   fontSelect.addEventListener('change', () => {
     previewText.style.fontFamily = FONT_MAP[fontSelect.value];
   });
-
+ 
   // ---- Font size ----
   fontSizeInput.addEventListener('input', () => {
     fontSizeVal.textContent = fontSizeInput.value + 'px';
     previewText.style.fontSize = fontSizeInput.value + 'px';
   });
-
+ 
   // ---- Alignment ----
   alignBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -618,32 +751,29 @@ function initEditorMode() {
       previewText.style.textAlign = activeAlign;
     });
   });
-
+ 
   // ---- Effect ----
   effectBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       effectBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activeEffect = btn.dataset.effect;
-      // Replay entrance on preview
       replayEntrance(previewText, activeEffect, textInput.value);
     });
   });
-
+ 
   // ---- Glow toggle ----
   glowToggle.addEventListener('change', () => {
     previewText.classList.toggle('glow', glowToggle.checked);
   });
-  // init glow
   previewText.classList.toggle('glow', glowToggle.checked);
-
+ 
   // ---- Vignette toggle ----
   vignetteToggle.addEventListener('change', () => {
     ps.setVignette(vignetteToggle.checked);
   });
-  // init vignette
   ps.setVignette(vignetteToggle.checked);
-
+ 
   // ---- Share link generation ----
   shareBtn.addEventListener('click', () => {
     const state = {
