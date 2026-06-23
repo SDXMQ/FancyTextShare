@@ -293,7 +293,7 @@ class BackgroundShader {
         uTime: { value: 0.0 },
         uResolution: { value: new THREE.Vector2() },
         uTheme: { value: 0 },
-        uVignette: { value: 1 }
+        uVignette: { value: 0 }
       };
       
       const geometry = new THREE.PlaneGeometry(2, 2);
@@ -644,7 +644,7 @@ function initViewerMode(state) {
   // Start background shader
   const ps = new BackgroundShader(canvas);
   ps.setTheme(state.theme || 0);
-  ps.setVignette(state.vignette !== undefined ? state.vignette : true);
+  ps.setVignette(state.vignette !== undefined ? state.vignette : false);
   ps.start();
   window.addEventListener('resize', () => { ps.resize(); });
 }
