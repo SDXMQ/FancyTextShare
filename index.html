@@ -78,6 +78,25 @@
             </div>
           </div>
 
+          <!-- Persistent Effect -->
+          <div class="panel-section">
+            <h2 data-i18n="section-persist"><i class="fa-solid fa-fire"></i> 지속 효과</h2>
+            <div class="effect-grid" id="persist-selector">
+              <button type="button" class="effect-btn active" data-persist="none">
+                <i class="fa-solid fa-ban"></i>
+                <span data-i18n="persist-none">없음</span>
+              </button>
+              <button type="button" class="effect-btn" data-persist="fireworks">
+                <i class="fa-solid fa-burst"></i>
+                <span data-i18n="persist-fireworks">폭죽</span>
+              </button>
+              <button type="button" class="effect-btn" data-persist="sparkle">
+                <i class="fa-solid fa-sparkles"></i>
+                <span data-i18n="persist-sparkle">반짝이</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Typography -->
           <div class="panel-section">
             <h2 data-i18n="section-style"><i class="fa-solid fa-font"></i> 스타일</h2>
@@ -172,8 +191,11 @@
       <div class="floating-text viewer-floating-text" id="viewer-text"></div>
     </div>
     <div class="viewer-watermark">FancyTextShare</div>
-    <a href="./" class="viewer-create-btn">
-      <i class="fa-solid fa-plus"></i> 나도 만들기
+    <button type="button" class="viewer-replay-btn" id="viewer-replay-btn" title="Replay Animation">
+      <i class="fa-solid fa-rotate-left"></i>
+    </button>
+    <a href="./" class="viewer-create-btn" id="viewer-create-btn">
+      <i class="fa-solid fa-plus"></i> <span data-i18n="btn-create-mine">나도 만들기</span>
     </a>
   </div>
 

@@ -89,7 +89,11 @@ const I18N_DICTS = {
     'footer-tagline': '서버 없이 링크로 감성 공유',
     'cache-notice': '업데이트가 반영되지 않거나 작동하지 않으면 강력 새로고침 (Ctrl+F5 / Cmd+Shift+R)을 해주세요.',
     'btn-create-mine': '나도 만들기',
-    'placeholder-text': '텍스트를 입력해주세요...'
+    'placeholder-text': '텍스트를 입력해주세요...',
+    'section-persist': '지속 효과',
+    'persist-none': '없음',
+    'persist-fireworks': '폭죽',
+    'persist-sparkle': '반짝이'
   },
   en: {
     'subtitle': 'Add emotion to your text and share it with a single link.',
@@ -114,7 +118,11 @@ const I18N_DICTS = {
     'footer-tagline': 'Share emotions with a serverless link',
     'cache-notice': 'If it does not work or update, please do a hard refresh (Ctrl+F5 / Cmd+Shift+R).',
     'btn-create-mine': 'Create My Own',
-    'placeholder-text': 'Please enter some text...'
+    'placeholder-text': 'Please enter some text...',
+    'section-persist': 'Persistent Effect',
+    'persist-none': 'None',
+    'persist-fireworks': 'Fireworks',
+    'persist-sparkle': 'Sparkle'
   }
 };
 
@@ -219,10 +227,12 @@ const CryptoEngine = (() => {
       const sizeOffset = Math.max(0, Math.min(63, (stateObj.size || 28) - 16));
       payload[1] = (sizeOffset << 2) | alignVal;
       
-      // Byte 3: vignette(1 bit, 0-1) | lang(1 bit, 0-1: 0=ko, 1=en) | remaining 6 bits reserved
+      // Byte 3: vignette(1 bit) | lang(1 bit) | persistEffect(2 bits) | remaining 4 bits reserved
       const vignetteVal = stateObj.vignette ? 1 : 0;
       const langVal = stateObj.lang === 'en' ? 1 : 0;
-      payload[2] = (vignetteVal & 0x01) | ((langVal & 0x01) << 1);
+      const persistMap = { 'none': 0, 'fireworks': 1, 'sparkle': 2 };
+      const persistVal = persistMap[stateObj.persistEffect] || 0;
+      payload[2] = (vignetteVal & 0x01) | ((langVal & 0x01) << 1) | ((persistVal & 0x03) << 2);
       
       // Set text bytes
       payload.set(textBytes, 3);
@@ -259,12 +269,14 @@ const CryptoEngine = (() => {
         const b3 = xored[2];
         const vignette = (b3 & 0x01) === 1;
         const lang = ((b3 >> 1) & 0x01) === 1 ? 'en' : 'ko';
+        const persistCode = (b3 >> 2) & 0x03;
+        const persistEffect = ['none', 'fireworks', 'sparkle'][persistCode] || 'none';
         
         // Parse Text
         const textBytes = xored.subarray(3);
         const text = new TextDecoder().decode(textBytes);
         
-        return { text, theme, effect, font, size, align, glow, vignette, lang };
+        return { text, theme, effect, font, size, align, glow, vignette, lang, persistEffect };
       } catch (e) {
         console.error('Decryption failed:', e);
         return null;
@@ -598,6 +610,280 @@ class BackgroundShader {
 }
 
 /* ============================================================
+   WebGLParticles — Three.js Additive Particle Effects
+   Modes: fireworks (physics burst), sparkle (cross-flare twinkle)
+   ============================================================ */
+class WebGLParticles {
+  constructor(container) {
+    this.container = container;
+    this.mode = 'none';
+    this.MAX = 500;
+    this.animId = null;
+    this.lastTime = 0;
+    this.nextRocket = 0;
+    this.w = 0; this.h = 0;
+
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'effect-canvas';
+    container.appendChild(this.canvas);
+
+    this.isFallback = false;
+    try {
+      this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: false });
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.autoClear = true;
+
+      this.scene = new THREE.Scene();
+      this.camera = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1);
+
+      const posArr = new Float32Array(this.MAX * 3);
+      const colArr = new Float32Array(this.MAX * 3);
+      const sizeArr = new Float32Array(this.MAX);
+      const alphaArr = new Float32Array(this.MAX);
+
+      this.geo = new THREE.BufferGeometry();
+      this.geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      this.geo.setAttribute('aColor', new THREE.BufferAttribute(colArr, 3));
+      this.geo.setAttribute('aSize', new THREE.BufferAttribute(sizeArr, 1));
+      this.geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphaArr, 1));
+      this.geo.setDrawRange(0, 0);
+
+      this.mat = new THREE.ShaderMaterial({
+        vertexShader: `
+          attribute float aSize;
+          attribute float aAlpha;
+          attribute vec3 aColor;
+          varying float vAlpha;
+          varying vec3 vColor;
+          void main() {
+            vAlpha = aAlpha;
+            vColor = aColor;
+            gl_PointSize = aSize;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          precision mediump float;
+          varying float vAlpha;
+          varying vec3 vColor;
+          uniform int uMode;
+          void main() {
+            vec2 c = gl_PointCoord - 0.5;
+            float d = length(c);
+            float shape;
+            if (uMode == 0) {
+              shape = exp(-d * d * 10.0);
+            } else {
+              float core = exp(-d * d * 25.0);
+              float fx = exp(-abs(c.y) * 35.0) * exp(-abs(c.x) * 8.0);
+              float fy = exp(-abs(c.x) * 35.0) * exp(-abs(c.y) * 8.0);
+              shape = max(core, max(fx, fy) * 0.5);
+            }
+            if (shape < 0.01) discard;
+            gl_FragColor = vec4(vColor, shape * vAlpha);
+          }
+        `,
+        uniforms: { uMode: { value: 0 } },
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        depthWrite: false
+      });
+
+      this.points = new THREE.Points(this.geo, this.mat);
+      this.scene.add(this.points);
+    } catch (e) {
+      console.warn('WebGL particles fallback to 2D:', e);
+      this.isFallback = true;
+      this.ctx = this.canvas.getContext('2d');
+    }
+
+    this.pool = [];
+    for (let i = 0; i < this.MAX; i++) this.pool.push({ active: false });
+  }
+
+  setMode(mode) {
+    this.mode = mode;
+    this.pool.forEach(p => p.active = false);
+    this.nextRocket = 0;
+    if (!this.isFallback) this.mat.uniforms.uMode.value = mode === 'sparkle' ? 1 : 0;
+    if (mode === 'none' && this.isFallback && this.ctx) {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  }
+
+  resize() {
+    const rect = this.container.getBoundingClientRect();
+    this.w = rect.width; this.h = rect.height;
+    if (this.isFallback) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      this.canvas.width = this.w * dpr;
+      this.canvas.height = this.h * dpr;
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    } else {
+      this.renderer.setSize(this.w, this.h, false);
+      this.camera.right = this.w;
+      this.camera.top = this.h;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  spawn(props) {
+    for (let i = 0; i < this.MAX; i++) {
+      if (!this.pool[i].active) { Object.assign(this.pool[i], props, { active: true }); return this.pool[i]; }
+    }
+    return null;
+  }
+
+  start() {
+    this.resize();
+    this.lastTime = performance.now();
+    const loop = (now) => {
+      const dt = Math.min((now - this.lastTime) / 1000, 0.05);
+      this.lastTime = now;
+      if (this.mode !== 'none') { this.update(dt, now / 1000); this.render(); }
+      this.animId = requestAnimationFrame(loop);
+    };
+    this.animId = requestAnimationFrame(loop);
+  }
+
+  stop() { if (this.animId) cancelAnimationFrame(this.animId); }
+
+  reset() {
+    this.pool.forEach(p => p.active = false);
+    this.nextRocket = 0;
+  }
+
+  update(dt, time) {
+    if (this.mode === 'fireworks') this.updateFireworks(dt, time);
+    else if (this.mode === 'sparkle') this.updateSparkle(dt, time);
+  }
+
+  updateFireworks(dt, time) {
+    const gravity = this.h * 0.4;
+    const drag = 0.984;
+
+    if (time > this.nextRocket) {
+      this.nextRocket = time + 1.2 + Math.random() * 1.6;
+      const x = this.w * (0.15 + Math.random() * 0.7);
+      const targetY = this.h * (0.3 + Math.random() * 0.45);
+      this.spawn({ type: 'rocket', x, y: 0, vx: (Math.random() - 0.5) * this.w * 0.04, vy: this.h * (0.5 + Math.random() * 0.2), life: 2, maxLife: 2, r: 1, g: 0.9, b: 0.6, size: 4, trailT: 0, targetY });
+    }
+
+    for (let i = 0; i < this.MAX; i++) {
+      const p = this.pool[i];
+      if (!p.active) continue;
+      p.life -= dt;
+      if (p.life <= 0) { p.active = false; continue; }
+
+      if (p.type === 'rocket') {
+        p.vy -= gravity * 0.5 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.trailT -= dt;
+        if (p.trailT <= 0) {
+          p.trailT = 0.025;
+          this.spawn({ type: 'trail', x: p.x + (Math.random() - 0.5) * 2, y: p.y, vx: 0, vy: -this.h * 0.02, life: 0.35, maxLife: 0.35, r: 1, g: 0.8, b: 0.4, size: 3 });
+        }
+        if (p.y >= p.targetY) { this.explode(p.x, p.y); p.active = false; }
+      } else {
+        if (p.type === 'burst') { p.vy -= gravity * dt; p.vx *= drag; p.vy *= drag; }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
+    }
+  }
+
+  explode(x, y) {
+    const count = 40 + Math.floor(Math.random() * 25);
+    const palette = [[1,0.85,0.3],[1,0.4,0.65],[0.3,0.9,1],[0.5,1,0.4],[0.75,0.5,1],[1,0.6,0.2]];
+    const ci = Math.floor(Math.random() * palette.length);
+    const ci2 = (ci + 1 + Math.floor(Math.random() * (palette.length - 1))) % palette.length;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = this.h * (0.12 + Math.random() * 0.28);
+      const col = Math.random() > 0.3 ? palette[ci] : palette[ci2];
+      this.spawn({ type: 'burst', x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1 + Math.random() * 0.8, maxLife: 1.8, r: col[0], g: col[1], b: col[2], size: 5 + Math.random() * 7 });
+    }
+  }
+
+  updateSparkle(dt) {
+    const active = this.pool.filter(p => p.active).length;
+    if (active < 80 && Math.random() < 0.25) {
+      const palette = [[1,1,0.95],[0.95,0.88,1],[1,0.92,0.8],[0.85,0.95,1],[1,0.85,0.92]];
+      const col = palette[Math.floor(Math.random() * palette.length)];
+      this.spawn({ type: 'sparkle', x: Math.random() * this.w, y: Math.random() * this.h, vx: 0, vy: 0, life: 1.5 + Math.random() * 2, maxLife: 3.5, r: col[0], g: col[1], b: col[2], size: 10 + Math.random() * 18 });
+    }
+    for (let i = 0; i < this.MAX; i++) {
+      const p = this.pool[i];
+      if (p.active) { p.life -= dt; if (p.life <= 0) p.active = false; }
+    }
+  }
+
+  render() {
+    if (this.isFallback) { this.renderFallback(); return; }
+    const posA = this.geo.getAttribute('position');
+    const colA = this.geo.getAttribute('aColor');
+    const sizeA = this.geo.getAttribute('aSize');
+    const alphaA = this.geo.getAttribute('aAlpha');
+    let n = 0;
+    for (let i = 0; i < this.MAX; i++) {
+      const p = this.pool[i];
+      if (!p.active) continue;
+      const lr = Math.max(0, p.life / p.maxLife);
+      let alpha;
+      if (this.mode === 'sparkle') {
+        const t = 1 - lr;
+        alpha = t < 0.2 ? t / 0.2 : (t > 0.7 ? (1 - t) / 0.3 : 1);
+      } else {
+        alpha = p.type === 'trail' ? lr * 0.6 : lr;
+      }
+      posA.array[n * 3] = p.x;
+      posA.array[n * 3 + 1] = p.y;
+      posA.array[n * 3 + 2] = 0;
+      colA.array[n * 3] = p.r;
+      colA.array[n * 3 + 1] = p.g;
+      colA.array[n * 3 + 2] = p.b;
+      sizeA.array[n] = p.size * (this.mode === 'fireworks' ? (0.4 + lr * 0.6) : 1);
+      alphaA.array[n] = alpha * 0.9;
+      n++;
+    }
+    this.geo.setDrawRange(0, n);
+    posA.needsUpdate = true; colA.needsUpdate = true;
+    sizeA.needsUpdate = true; alphaA.needsUpdate = true;
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  renderFallback() {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.w, this.h);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < this.MAX; i++) {
+      const p = this.pool[i];
+      if (!p.active) continue;
+      const lr = Math.max(0, p.life / p.maxLife);
+      let alpha;
+      if (this.mode === 'sparkle') { const t = 1 - lr; alpha = t < 0.2 ? t / 0.2 : (t > 0.7 ? (1 - t) / 0.3 : 1); }
+      else { alpha = p.type === 'trail' ? lr * 0.6 : lr; }
+      const drawY = this.h - p.y;
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.shadowBlur = p.size * 2;
+      const rgb = `rgb(${Math.floor(p.r*255)},${Math.floor(p.g*255)},${Math.floor(p.b*255)})`;
+      ctx.shadowColor = rgb; ctx.fillStyle = rgb;
+      ctx.beginPath(); ctx.arc(p.x, drawY, Math.max(1, p.size / 2), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0;
+  }
+
+  destroy() {
+    this.stop();
+    if (this.canvas.parentElement) this.canvas.parentElement.removeChild(this.canvas);
+    if (!this.isFallback && this.renderer) { this.renderer.dispose(); this.geo.dispose(); this.mat.dispose(); }
+  }
+}
+
+/* ============================================================
    App — Main Controller
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
@@ -647,6 +933,21 @@ function initViewerMode(state) {
   ps.setVignette(state.vignette !== undefined ? state.vignette : false);
   ps.start();
   window.addEventListener('resize', () => { ps.resize(); });
+
+  // Start persistent effect
+  const fx = new WebGLParticles(viewerView);
+  fx.setMode(state.persistEffect || 'none');
+  fx.start();
+  window.addEventListener('resize', () => { fx.resize(); });
+
+  // Bind replay animation trigger
+  const replayBtn = document.getElementById('viewer-replay-btn');
+  if (replayBtn) {
+    replayBtn.addEventListener('click', () => {
+      replayEntrance(textEl, state.effect || 'floatUp', state.text || '');
+      fx.reset();
+    });
+  }
 }
 
 /* ---------- Editor Mode ---------- */
@@ -659,7 +960,8 @@ function initEditorMode() {
   const fontSizeInput = document.getElementById('font-size');
   const fontSizeVal = document.getElementById('font-size-val');
   const alignBtns = document.querySelectorAll('.align-btn');
-  const effectBtns = document.querySelectorAll('.effect-btn');
+  const effectBtns = document.querySelectorAll('#effect-selector .effect-btn');
+  const persistBtns = document.querySelectorAll('#persist-selector .effect-btn');
   const glowToggle = document.getElementById('text-glow');
   const vignetteToggle = document.getElementById('bg-vignette');
   const previewText = document.getElementById('preview-text');
@@ -669,11 +971,14 @@ function initEditorMode() {
   const copyBtn = document.getElementById('copy-btn');
 
   const previewCanvas = document.getElementById('preview-canvas');
+  const previewContainer = document.getElementById('preview-container');
   const ps = new BackgroundShader(previewCanvas);
+  const fx = new WebGLParticles(previewContainer);
 
   // State
   let activeTheme = 0;
   let activeEffect = 'floatUp';
+  let activePersist = 'none';
   let activeAlign = 'center';
   let isUserModified = false;
 
@@ -714,7 +1019,8 @@ function initEditorMode() {
   // Init preview canvas
   ps.setTheme(0);
   ps.start();
-  window.addEventListener('resize', () => { ps.resize(); });
+  fx.start();
+  window.addEventListener('resize', () => { ps.resize(); fx.resize(); });
  
   // ---- Text input live sync ----
   charCount.textContent = textInput.value.length;
@@ -761,6 +1067,16 @@ function initEditorMode() {
       replayEntrance(previewText, activeEffect, textInput.value);
     });
   });
+
+  // ---- Persistent Effect ----
+  persistBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      persistBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activePersist = btn.dataset.persist;
+      fx.setMode(activePersist);
+    });
+  });
  
   // ---- Glow toggle ----
   glowToggle.addEventListener('change', () => {
@@ -784,7 +1100,8 @@ function initEditorMode() {
       size: parseInt(fontSizeInput.value),
       align: activeAlign,
       glow: glowToggle.checked,
-      vignette: vignetteToggle.checked
+      vignette: vignetteToggle.checked,
+      persistEffect: activePersist
     };
 
     const encrypted = CryptoEngine.encrypt(state);
