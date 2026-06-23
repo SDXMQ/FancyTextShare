@@ -413,7 +413,7 @@ class BackgroundShader {
     } else {
       if (this.canvas.width !== width || this.canvas.height !== height) {
         this.renderer.setSize(width, height, false);
-        this.uniforms.uResolution.value.set(width, height);
+        this.uniforms.uResolution.value.set(this.canvas.width, this.canvas.height);
       }
     }
   }
@@ -610,7 +610,8 @@ class WebGLParticles {
         vertexShader: `
           attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
           varying float vAlpha; varying vec3 vColor;
-          void main() { vAlpha = aAlpha; vColor = aColor; gl_PointSize = aSize; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+          uniform float uPixelRatio;
+          void main() { vAlpha = aAlpha; vColor = aColor; gl_PointSize = aSize * uPixelRatio; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
         `,
         fragmentShader: `
           precision mediump float; varying float vAlpha; varying vec3 vColor; uniform int uMode;
@@ -621,7 +622,10 @@ class WebGLParticles {
             if (shape < 0.01) discard; gl_FragColor = vec4(vColor, shape * vAlpha);
           }
         `,
-        uniforms: { uMode: { value: 0 } },
+        uniforms: { 
+          uMode: { value: 0 },
+          uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 1.5) }
+        },
         transparent: true, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
       });
 
@@ -641,7 +645,13 @@ class WebGLParticles {
     this.pool.forEach(p => p.active = false);
     this.nextRocket = 0;
     if (!this.isFallback) this.mat.uniforms.uMode.value = mode === 'sparkle' ? 1 : 0;
-    if (mode === 'none' && this.isFallback && this.ctx) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (mode === 'none') {
+      if (this.isFallback && this.ctx) {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      } else if (this.renderer) {
+        this.renderer.clear();
+      }
+    }
   }
 
   resize() {
