@@ -16,37 +16,43 @@ const THEMES = [
     id: 'starryNight', label: '밤하늘',
     bgGradient: ['#070b1a', '#0f1b3d', '#162050'],
     previewGradient: 'linear-gradient(135deg, #070b1a, #0f1b3d, #162050)',
-    particles: 'stars'
+    particles: 'stars',
+    defaultText: '밤하늘에 띄우는 나의 마음'
   },
   {
     id: 'dawn', label: '새벽',
     bgGradient: ['#1a0533', '#3d1259', '#c0392b', '#f39c12'],
     previewGradient: 'linear-gradient(to top, #f39c12, #c0392b, #3d1259, #1a0533)',
-    particles: 'fireflies'
+    particles: 'fireflies',
+    defaultText: '새벽하늘을 수놓은 아련한 고백'
   },
   {
     id: 'morning', label: '아침',
     bgGradient: ['#4facfe', '#00f2fe'],
     previewGradient: 'linear-gradient(135deg, #4facfe, #00f2fe)',
-    particles: 'floatingLight'
+    particles: 'floatingLight',
+    defaultText: '싱그러운 아침 햇살 아래 첫인사'
   },
   {
     id: 'sunset', label: '노을',
     bgGradient: ['#fa709a', '#fee140', '#f7797d'],
     previewGradient: 'linear-gradient(to top, #fee140, #fa709a, #f7797d)',
-    particles: 'warmDust'
+    particles: 'warmDust',
+    defaultText: '붉게 물든 저녁 노을빛을 담아'
   },
   {
     id: 'aurora', label: '오로라',
     bgGradient: ['#0f0c29', '#302b63', '#24243e'],
     previewGradient: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
-    particles: 'aurora'
+    particles: 'aurora',
+    defaultText: '춤추는 오로라 아래 그린 기적'
   },
   {
     id: 'deepSea', label: '심해',
     bgGradient: ['#000428', '#004e92'],
     previewGradient: 'linear-gradient(135deg, #000428, #004e92)',
-    particles: 'bubbles'
+    particles: 'bubbles',
+    defaultText: '깊은 심해 속 고요히 흐르는 생각'
   }
 ];
 
@@ -81,17 +87,60 @@ const CryptoEngine = (() => {
 
   return {
     encrypt(stateObj) {
-      const json = JSON.stringify(stateObj);
-      const encoded = new TextEncoder().encode(json);
-      const xored = xorBytes(encoded, KEY);
+      const textEncoder = new TextEncoder();
+      const textBytes = textEncoder.encode(stateObj.text || '');
+      
+      // Create payload: 2 bytes header + text bytes
+      const payload = new Uint8Array(2 + textBytes.length);
+      
+      // Byte 1: theme(3 bits, 0-7) | effect(2 bits, 0-3) | font(2 bits, 0-3) | glow(1 bit, 0-1)
+      const effectMap = { 'floatUp': 0, 'fadeGlow': 1, 'typewriter': 2 };
+      const effectVal = effectMap[stateObj.effect] !== undefined ? effectMap[stateObj.effect] : 0;
+      const glowVal = stateObj.glow ? 1 : 0;
+      payload[0] = ((stateObj.theme & 0x07) << 5) | ((effectVal & 0x03) << 3) | ((stateObj.font & 0x03) << 1) | glowVal;
+      
+      // Byte 2: sizeOffset(6 bits, 0-63, representing size 16-56) | align(2 bits, 0-3)
+      const alignMap = { 'left': 0, 'center': 1, 'right': 2 };
+      const alignVal = alignMap[stateObj.align] !== undefined ? alignMap[stateObj.align] : 1;
+      const sizeOffset = Math.max(0, Math.min(63, (stateObj.size || 28) - 16));
+      payload[1] = (sizeOffset << 2) | alignVal;
+      
+      // Set text bytes
+      payload.set(textBytes, 2);
+      
+      const xored = xorBytes(payload, KEY);
       return toBase64Url(xored);
     },
     decrypt(hash) {
       try {
         const bytes = fromBase64Url(hash);
         const xored = xorBytes(bytes, KEY);
-        const json = new TextDecoder().decode(xored);
-        return JSON.parse(json);
+        if (xored.length < 2) return null;
+        
+        // Parse Byte 1
+        const b1 = xored[0];
+        const theme = (b1 >> 5) & 0x07;
+        const effectCode = (b1 >> 3) & 0x03;
+        const font = (b1 >> 1) & 0x03;
+        const glow = (b1 & 0x01) === 1;
+        
+        const effectMap = ['floatUp', 'fadeGlow', 'typewriter'];
+        const effect = effectMap[effectCode] || 'floatUp';
+        
+        // Parse Byte 2
+        const b2 = xored[1];
+        const sizeOffset = (b2 >> 2) & 0x3F;
+        const size = sizeOffset + 16;
+        const alignCode = b2 & 0x03;
+        
+        const alignMap = ['left', 'center', 'right'];
+        const align = alignMap[alignCode] || 'center';
+        
+        // Parse Text
+        const textBytes = xored.subarray(2);
+        const text = new TextDecoder().decode(textBytes);
+        
+        return { text, theme, effect, font, size, align, glow };
       } catch (e) {
         console.error('Decryption failed:', e);
         return null;
@@ -400,6 +449,7 @@ function initEditorMode() {
   let activeTheme = 0;
   let activeEffect = 'floatUp';
   let activeAlign = 'center';
+  let isUserModified = false;
 
   // ---- Theme buttons ----
   THEMES.forEach((theme, i) => {
@@ -413,6 +463,13 @@ function initEditorMode() {
       btn.classList.add('active');
       activeTheme = i;
       ps.setTheme(i);
+
+      // If user hasn't edited the text, apply the new theme's default text
+      if (!isUserModified) {
+        textInput.value = theme.defaultText;
+        syncPreview();
+        replayEntrance(previewText, activeEffect, textInput.value);
+      }
     });
     themeSelector.appendChild(btn);
   });
@@ -428,7 +485,15 @@ function initEditorMode() {
     previewText.textContent = textInput.value || '텍스트를 입력해주세요...';
     charCount.textContent = textInput.value.length;
   }
-  textInput.addEventListener('input', syncPreview);
+  textInput.addEventListener('input', () => {
+    // If text is cleared, reset modification flag to allow default theme texts again
+    if (textInput.value.trim() === '') {
+      isUserModified = false;
+    } else {
+      isUserModified = true;
+    }
+    syncPreview();
+  });
 
   // ---- Font family ----
   fontSelect.addEventListener('change', () => {
