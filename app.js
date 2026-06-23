@@ -972,6 +972,7 @@ function initEditorMode() {
   const shareResult = document.getElementById('share-result');
   const shareUrlInput = document.getElementById('share-url');
   const copyBtn = document.getElementById('copy-btn');
+  const previewReplayBtn = document.getElementById('preview-replay-btn');
 
   const previewCanvas = document.getElementById('preview-canvas');
   const previewContainer = document.getElementById('preview-container');
@@ -1142,6 +1143,14 @@ function initEditorMode() {
       } else {
         window.location.href = currentUrl.toString();
       }
+    });
+  }
+
+  // ---- Replay animation in preview ----
+  if (previewReplayBtn) {
+    previewReplayBtn.addEventListener('click', () => {
+      replayEntrance(previewText, activeEffect, textInput.value);
+      fx.reset();
     });
   }
 }
