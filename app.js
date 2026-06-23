@@ -88,6 +88,7 @@ const I18N_DICTS = {
     'share-hint': '이 링크를 상대방에게 보내면 당신이 만든 그대로 보입니다!',
     'footer-tagline': '서버 없이 링크로 감성 공유',
     'cache-notice': '업데이트가 반영되지 않거나 작동하지 않으면 강력 새로고침 (Ctrl+F5 / Cmd+Shift+R)을 해주세요.',
+    'btn-update-check': '업데이트 확인',
     'btn-create-mine': '나도 만들기',
     'placeholder-text': '텍스트를 입력해주세요...',
     'section-persist': '지속 효과',
@@ -117,6 +118,7 @@ const I18N_DICTS = {
     'share-hint': 'Send this link to someone and they will see exactly what you created!',
     'footer-tagline': 'Share emotions with a serverless link',
     'cache-notice': 'If it does not work or update, please do a hard refresh (Ctrl+F5 / Cmd+Shift+R).',
+    'btn-update-check': 'Check for Updates',
     'btn-create-mine': 'Create My Own',
     'placeholder-text': 'Please enter some text...',
     'section-persist': 'Persistent Effect',
@@ -913,6 +915,7 @@ function initViewerMode(state) {
   
   // Hide language toggle button in fullscreen viewer
   document.querySelector('.lang-selector')?.classList.add('hidden');
+  document.querySelector('.update-selector')?.classList.add('hidden');
 
   const canvas = document.getElementById('viewer-canvas');
   const textEl = document.getElementById('viewer-text');
@@ -1121,6 +1124,26 @@ function initEditorMode() {
       setTimeout(() => { icon.className = 'fa-solid fa-copy'; copyBtn.style.color = ''; }, 1500);
     });
   });
+
+  // ---- Hard refresh / Update check button ----
+  const updateBtn = document.getElementById('update-btn');
+  if (updateBtn) {
+    updateBtn.addEventListener('click', () => {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('t', Date.now());
+
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          return Promise.all(names.map(name => caches.delete(name)));
+        }).catch(err => console.warn('Cache clear failed:', err))
+          .finally(() => {
+            window.location.href = currentUrl.toString();
+          });
+      } else {
+        window.location.href = currentUrl.toString();
+      }
+    });
+  }
 }
 
 /* ---------- Entrance Effects ---------- */
