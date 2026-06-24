@@ -1,8 +1,25 @@
 /* ============================================================
    6.5. WeatherManager (Live Weather Helpers)
    ============================================================ */
-const WeatherManager = {
-  cachedCode: null,
+window.FTS = window.FTS || {};
+
+FTS.showToast = function(msg) {
+  let toast = document.getElementById('fts-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'fts-toast';
+    toast.className = 'error-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
+};
+
+class WeatherManagerClass {
+  cachedCode = null;
 
   init(shader, particles) {
     if (this.cachedCode !== null) {
@@ -20,7 +37,7 @@ const WeatherManager = {
     } else {
       this.showConsentModal(shader, particles);
     }
-  },
+  }
 
   showConsentModal(shader, particles) {
     const modal = document.getElementById('location-consent-modal');
@@ -45,15 +62,24 @@ const WeatherManager = {
     newDenyBtn.addEventListener('click', () => {
       modal.classList.add('hidden');
     }, { once: true });
-  },
+  }
 
   requestGeolocationAndApply(shader, particles) {
     if (!navigator.geolocation) { return; }
     navigator.geolocation.getCurrentPosition(
       (pos) => this.fetchWeather(pos.coords.latitude, pos.coords.longitude, shader, particles),
-      () => { /* keep default */ }
+      () => { this.handleWeatherError(shader, particles); }
     );
-  },
+  }
+
+  handleWeatherError(shader, particles) {
+    if (FTS.i18n) {
+      FTS.showToast(FTS.i18n.get('weather-error'));
+    }
+    // Default fallback: morning theme, none particles
+    shader.setTheme(2);
+    particles.setMode('none');
+  }
 
   async fetchWeather(lat, lon, shader, particles) {
     try {
@@ -63,8 +89,10 @@ const WeatherManager = {
       const data = await res.json();
       this.cachedCode = data.current.weather_code;
       this.applyWeatherMapping(this.cachedCode, shader, particles);
-    } catch { /* keep default */ }
-  },
+    } catch { 
+      this.handleWeatherError(shader, particles);
+    }
+  }
 
   applyWeatherMapping(code, shader, particles) {
     const hour = new Date().getHours();
@@ -92,4 +120,5 @@ const WeatherManager = {
     shader.setTheme(shaderTheme);
     particles.setMode(particleMode);
   }
-};
+}
+FTS.WeatherManager = new WeatherManagerClass();

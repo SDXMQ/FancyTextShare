@@ -1,7 +1,8 @@
 /* ============================================================
    4. CryptoEngine
    ============================================================ */
-const CryptoEngine = (() => {
+window.FTS = window.FTS || {};
+FTS.CryptoEngine = (() => {
   const KEY = 'FncyTxtShr2026!';
 
   function xorBytes(data, key) {

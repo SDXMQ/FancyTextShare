@@ -1,6 +1,7 @@
 /* ============================================================
    3. Entrance Effects (Strategy Pattern)
    ============================================================ */
+window.FTS = window.FTS || {};
 class BaseEntranceEffect {
   apply(el, text) {
     this.reset(el);
@@ -71,3 +72,8 @@ class EntranceEffectFactory {
     }
   }
 }
+FTS.BaseEntranceEffect = BaseEntranceEffect;
+FTS.FloatUpEffect = FloatUpEffect;
+FTS.FadeGlowEffect = FadeGlowEffect;
+FTS.TypewriterEffect = TypewriterEffect;
+FTS.EntranceEffectFactory = EntranceEffectFactory;

@@ -1,7 +1,8 @@
 /* ============================================================
    1. Configuration & Constants
    ============================================================ */
-const Config = {
+window.FTS = window.FTS || {};
+FTS.Config = {
   FONTS: [
     "'Outfit', 'Noto Sans KR', sans-serif",
     "'Playfair Display', serif",
@@ -98,7 +99,8 @@ const Config = {
       'consent-title': '위치 정보 사용 안내',
       'consent-body': '이 카드는 당신이 있는 곳의 실시간 날씨를 배경에 반영합니다. 위치 정보 사용을 허용해 주시겠어요?',
       'consent-allow': '허용할게요',
-      'consent-deny': '괜찮아요'
+      'consent-deny': '괜찮아요',
+      'weather-error': '위치 정보 수신 또는 날씨 조회가 실패하여 기본 테마로 표시됩니다.'
     },
     en: {
       'subtitle': 'Add emotion to your text and share it with a single link.',
@@ -132,7 +134,8 @@ const Config = {
       'consent-title': 'Location Access',
       'consent-body': 'This card reflects the live weather at your location. Would you allow location access?',
       'consent-allow': 'Allow',
-      'consent-deny': 'No thanks'
+      'consent-deny': 'No thanks',
+      'weather-error': 'Failed to fetch live weather. Showing default theme.'
     }
   }
 };

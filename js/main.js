@@ -12,8 +12,8 @@ class ViewController {
     this.textEl = document.getElementById('viewer-text');
     this.replayBtn = document.getElementById('viewer-replay-btn');
     
-    this.shader = new BackgroundShader(this.canvas);
-    this.particles = new WebGLParticles(this.viewerView);
+    this.shader = new FTS.BackgroundShader(this.canvas);
+    this.particles = new FTS.WebGLParticles(this.viewerView);
   }
 
   init() {
@@ -30,14 +30,15 @@ class ViewController {
 
     // Weather theme (index 6) needs async location/weather resolution
     if (this.state.theme === 6) {
-      WeatherManager.init(this.shader, this.particles);
+      this.setupGraphics(2, 'none');
+      FTS.WeatherManager.init(this.shader, this.particles);
     } else {
       this.setupGraphics();
     }
   }
 
   renderText() {
-    this.textEl.style.fontFamily = Config.FONTS[this.state.font || 0];
+    this.textEl.style.fontFamily = FTS.Config.FONTS[this.state.font || 0];
     this.textEl.style.fontSize = (this.state.size || 28) + 'px';
     this.textEl.style.textAlign = this.state.align || 'center';
     
@@ -50,7 +51,7 @@ class ViewController {
       this.textEl.dataset.glow = 'false';
     }
 
-    const effect = EntranceEffectFactory.getEffect(this.state.effect || 'floatUp');
+    const effect = FTS.EntranceEffectFactory.getEffect(this.state.effect || 'floatUp');
     effect.apply(this.textEl, this.state.text || '');
   }
 
@@ -73,7 +74,7 @@ class ViewController {
   bindEvents() {
     if (this.replayBtn) {
       this.replayBtn.addEventListener('click', () => {
-        const effect = EntranceEffectFactory.getEffect(this.state.effect || 'floatUp');
+        const effect = FTS.EntranceEffectFactory.getEffect(this.state.effect || 'floatUp');
         effect.replay(this.textEl, this.state.text || '');
         this.particles.reset();
       });
@@ -129,13 +130,13 @@ class EditorController {
     };
 
     // Graphics
-    this.shader = new BackgroundShader(this.ui.previewCanvas);
-    this.particles = new WebGLParticles(this.ui.previewContainer);
+    this.shader = new FTS.BackgroundShader(this.ui.previewCanvas);
+    this.particles = new FTS.WebGLParticles(this.ui.previewContainer);
   }
 
   init() {
     this.i18n.setLanguage('ko');
-    this.state.text = Config.THEMES[0].defaultText['ko'];
+    this.state.text = FTS.Config.THEMES[0].defaultText['ko'];
     this.ui.textInput.value = this.state.text;
     
     this.renderThemeButtons();
@@ -168,7 +169,7 @@ class EditorController {
     // Typography
     this.ui.fontSelect.addEventListener('change', () => {
       this.state.font = parseInt(this.ui.fontSelect.value);
-      this.ui.previewText.style.fontFamily = Config.FONTS[this.state.font];
+      this.ui.previewText.style.fontFamily = FTS.Config.FONTS[this.state.font];
     });
 
     this.ui.fontSizeInput.addEventListener('input', () => {
@@ -234,7 +235,7 @@ class EditorController {
     this.i18n.onChange((lang) => {
       this.renderThemeButtons();
       if (!this.state.isUserModified) {
-        this.state.text = Config.THEMES[this.state.theme].defaultText[lang];
+        this.state.text = FTS.Config.THEMES[this.state.theme].defaultText[lang];
         this.ui.textInput.value = this.state.text;
         this.syncPreview();
         this.triggerEntranceEffect();
@@ -270,7 +271,7 @@ class EditorController {
     this.ui.themeSelector.querySelectorAll('.theme-btn')[index]?.classList.add('active');
 
     if (index === 6) {
-      WeatherManager.init(this.shader, this.particles);
+      FTS.WeatherManager.init(this.shader, this.particles);
     } else {
       this.shader.setTheme(index);
       // Restore default persistent particle effect for other themes
@@ -278,7 +279,7 @@ class EditorController {
     }
 
     if (!this.state.isUserModified) {
-      this.state.text = Config.THEMES[index].defaultText[this.i18n.lang];
+      this.state.text = FTS.Config.THEMES[index].defaultText[this.i18n.lang];
       this.ui.textInput.value = this.state.text;
       this.syncPreview();
       this.triggerEntranceEffect();
@@ -287,7 +288,7 @@ class EditorController {
 
   renderThemeButtons() {
     this.ui.themeSelector.innerHTML = '';
-    Config.THEMES.forEach((theme, i) => {
+    FTS.Config.THEMES.forEach((theme, i) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `theme-btn ${i === this.state.theme ? 'active' : ''}`;
@@ -305,7 +306,7 @@ class EditorController {
   }
 
   triggerEntranceEffect() {
-    const effect = EntranceEffectFactory.getEffect(this.state.effect);
+    const effect = FTS.EntranceEffectFactory.getEffect(this.state.effect);
     const displayStr = this.state.text || this.i18n.get('placeholder-text');
     effect.replay(this.ui.previewText, displayStr);
   }
@@ -315,7 +316,7 @@ class EditorController {
       ...this.state,
       lang: this.i18n.lang
     };
-    const encrypted = CryptoEngine.encrypt(payload);
+    const encrypted = FTS.CryptoEngine.encrypt(payload);
     const base = window.location.origin + window.location.pathname;
     this.ui.shareUrlInput.value = base + '#' + encrypted;
     this.ui.shareResult.classList.remove('hidden');
@@ -339,11 +340,13 @@ class EditorController {
    9. Application Entry Point
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
-  const i18nManager = new I18nManager('ko');
+  const i18nManager = new FTS.I18nManager('ko');
+  window.FTS = window.FTS || {};
+  FTS.i18n = i18nManager;
 
   const hashData = window.location.hash.slice(1);
   if (hashData) {
-    const state = CryptoEngine.decrypt(hashData);
+    const state = FTS.CryptoEngine.decrypt(hashData);
     if (state) {
       const viewer = new ViewController(state, i18nManager);
       viewer.init();

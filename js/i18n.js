@@ -1,6 +1,7 @@
 /* ============================================================
    2. I18nManager
    ============================================================ */
+window.FTS = window.FTS || {};
 class I18nManager {
   constructor(defaultLang = 'ko') {
     this.lang = defaultLang;
@@ -8,7 +9,7 @@ class I18nManager {
   }
 
   setLanguage(lang) {
-    if (!Config.I18N[lang]) return;
+    if (!FTS.Config.I18N[lang]) return;
     this.lang = lang;
     this.updateDOM();
     this.notifyListeners();
@@ -19,7 +20,7 @@ class I18nManager {
   }
 
   get(key) {
-    return Config.I18N[this.lang][key] || key;
+    return FTS.Config.I18N[this.lang][key] || key;
   }
 
   onChange(callback) {
@@ -37,7 +38,7 @@ class I18nManager {
     // Translate simple elements
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.getAttribute('data-i18n');
-      if (Config.I18N[this.lang][key]) {
+      if (FTS.Config.I18N[this.lang][key]) {
         const icon = el.querySelector('i');
         if (icon) {
           el.innerHTML = '';
@@ -52,9 +53,10 @@ class I18nManager {
     // Translate placeholders
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
       const key = el.getAttribute('data-i18n-placeholder');
-      if (Config.I18N[this.lang][key]) {
+      if (FTS.Config.I18N[this.lang][key]) {
         el.setAttribute('placeholder', this.get(key));
       }
     });
   }
 }
+FTS.I18nManager = I18nManager;

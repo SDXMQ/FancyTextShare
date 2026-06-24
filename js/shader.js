@@ -1,6 +1,7 @@
 /* ============================================================
    5. BackgroundShader
    ============================================================ */
+window.FTS = window.FTS || {};
 class BackgroundShader {
   constructor(canvas) {
     this.canvas = canvas;
@@ -90,7 +91,7 @@ class BackgroundShader {
 
   renderFallback() {
     const ctx = this.ctx;
-    const theme = Config.THEMES[this.themeIndex];
+    const theme = FTS.Config.THEMES[this.themeIndex];
     if (!theme) return;
     
     const grad = ctx.createLinearGradient(0, 0, 0, this.h);
@@ -204,6 +205,7 @@ class BackgroundShader {
         else if (uTheme == 3) color = sunset(uv, uTime);
         else if (uTheme == 4) color = aurora(uv, uTime);
         else if (uTheme == 5) color = deepSea(uv, uTime);
+        else color = morning(uv, uTime);
         if (uVignette == 1) {
           float aspect = uResolution.x / uResolution.y;
           vec2 aspectUv = vec2(uv.x * aspect, uv.y);
@@ -215,3 +217,4 @@ class BackgroundShader {
     `;
   }
 }
+FTS.BackgroundShader = BackgroundShader;

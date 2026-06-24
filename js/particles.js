@@ -1,11 +1,11 @@
 /* ============================================================
    6. WebGLParticles
    ============================================================ */
+window.FTS = window.FTS || {};
 class WebGLParticles {
   constructor(container) {
     this.container = container;
     this.mode = 'none';
-    this.MAX = 500;
     this.animId = null;
     this.lastTime = 0;
     this.nextRocket = 0;
@@ -18,6 +18,7 @@ class WebGLParticles {
     this.isFallback = false;
     try {
       this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: true, antialias: false });
+      this.MAX = 1200;
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       this.renderer.setClearColor(0x000000, 0);
       this.renderer.autoClear = true;
@@ -65,6 +66,7 @@ class WebGLParticles {
     } catch (e) {
       console.warn('WebGL particles fallback to 2D:', e);
       this.isFallback = true;
+      this.MAX = 300;
       this.ctx = this.canvas.getContext('2d');
     }
 
@@ -227,11 +229,12 @@ class WebGLParticles {
       const lr = Math.max(0, p.life / p.maxLife); let alpha;
       if (this.mode === 'sparkle') { const t = 1 - lr; alpha = t < 0.2 ? t / 0.2 : (t > 0.7 ? (1 - t) / 0.3 : 1); }
       else { alpha = p.type === 'trail' ? lr * 0.6 : lr; }
-      const drawY = this.h - p.y; ctx.globalAlpha = alpha * 0.8; ctx.shadowBlur = p.size * 2;
+      const drawY = this.h - p.y; ctx.globalAlpha = alpha * 0.8;
       const rgb = `rgb(${Math.floor(p.r*255)},${Math.floor(p.g*255)},${Math.floor(p.b*255)})`;
-      ctx.shadowColor = rgb; ctx.fillStyle = rgb;
+      ctx.fillStyle = rgb;
       ctx.beginPath(); ctx.arc(p.x, drawY, Math.max(1, p.size / 2), 0, Math.PI * 2); ctx.fill();
     }
-    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 }
+FTS.WebGLParticles = WebGLParticles;
