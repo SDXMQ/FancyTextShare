@@ -32,8 +32,8 @@ FancyTextShare는 텍스트에 몽환적이고 아름다운 감성 디자인을 
 * 이를 통해 데이터베이스 저장 없이도 한글 텍스트 카드를 **약 50자 안팎의 아주 짧은 주소**로 생성하여 메신저 등으로 간편히 공유할 수 있습니다.
 
 ### 4. 견고한 객체 지향(OOP) 아키텍처
-* **단일 파일 클래스 구조**: 복잡한 외부 번들러 연동 없이 하나의 `app.js` 파일만 사용하여 오프라인 환경(`file://`)에서도 즉시 실행되는 강력한 접근성을 보장합니다.
-* **확장성**: 내부 코드는 철저한 분업(SRP)에 기반해 있습니다. 다국어 처리를 캡슐화한 `I18nManager`, 전략 패턴(Strategy Pattern)으로 다양한 시각 효과를 제어하는 `EntranceEffectManager`, 화면의 라이프사이클을 통제하는 `EditorController` 등 유지보수와 기능 확장이 매우 용이한 구조를 갖추고 있습니다.
+* **빌드 도구 없는 파일 분할 구조**: 복잡한 외부 번들러나 로컬 웹 서버 연동 없이 `js/` 디렉토리 내부의 분리된 소스 파일들을 순차적으로 로드하여, 오프라인 환경(`file://`)에서도 `index.html` 더블 클릭만으로 즉시 실행되는 강력한 접근성을 그대로 유지했습니다.
+* **확장성**: 내부 코드는 철저한 분업(SRP)에 기반해 있습니다. 다국어 처리를 캡슐화한 `I18nManager`, 전략 패턴(Strategy Pattern)으로 다양한 시각 효과를 제어하는 `EntranceEffectFactory`, 화면의 라이프사이클을 통제하는 `EditorController`/`ViewController` 등 유지보수와 기능 확장이 매우 용이한 구조를 갖추고 있습니다.
 
 ---
 
@@ -75,7 +75,15 @@ FancyTextShare/
 ├── .github/
 │   └── workflows/
 │       └── static.yml    # GitHub Pages Actions 자동화 파일
-├── app.js                # Three.js 셰이더 제어 및 압축 복구 코어 로직
+├── js/                   # 역할별로 모듈화된 자바스크립트 파일들
+│   ├── config.js         # 설정 및 테마 목록 데이터 정의
+│   ├── i18n.js           # 다국어 처리 매니저 (I18nManager)
+│   ├── effects.js        # 텍스트 등장 애니메이션 효과 클래스들
+│   ├── crypto.js         # 공유 해시 난독화/복호화 암호화 엔진 (CryptoEngine)
+│   ├── shader.js         # Three.js 배경 셰이더 렌더러 클래스 (BackgroundShader)
+│   ├── particles.js      # Three.js 파티클 효과 렌더러 클래스 (WebGLParticles)
+│   ├── weather.js        # 실시간 날씨 데이터 수신 및 매핑 매니저 (WeatherManager)
+│   └── main.js           # 에디터/뷰어 컨트롤러 및 DOM 초기화 진입점
 ├── index.html            # 시맨틱 구조 및 SEO 최적화 메인 마크업
 ├── README.md             # 프로젝트 소개 안내 문서
 └── style.css             # 글라스모피즘 스타일 및 모던 UI CSS
@@ -101,3 +109,7 @@ FancyTextShare/
   - **실시간 날씨 입자 효과**: 비(Rainy)가 올 때는 빠른 낙하 입자를, 눈(Snowy)이 올 때는 흔들리며 내리는 눈송이 애니메이션을 WebGL 캔버스 상에 덧씌워 렌더링합니다.
   - **시간대별 배경 유동 매핑**: 현재 시각(`new Date().getHours()`)을 감지하여, 낮/밤/황혼에 맞는 가장 어울리는 배경 셰이더(Morning/Sunset/Dawn/Starry Night 등)가 날씨 상태와 연계되어 자동으로 표현됩니다.
   - **제작자 프리뷰 지원 및 메모리 캐싱 (WYSIWYG)**: 제작자(Editor) 모드에서도 '현재날씨' 테마 선택 시 실제 날씨에 맞게 실시간 렌더링되도록 리팩토링했습니다. 또한, 다른 테마로 이동했다가 돌아왔을 때 위치 재조회 및 API 재호출 딜레이 없이 즉각 기존 테마가 적용될 수 있도록 획득한 날씨 코드를 메모리에 캐싱(`cachedCode`) 처리했습니다.
+* **코드 모듈화 및 파일 분할 리팩토링**
+  - **모놀리식 구조 해제**: 단일 파일인 `app.js`를 역할과 책임에 따라 `js/` 디렉토리 아래의 8개 소스 파일(`config.js`, `i18n.js`, `effects.js`, `crypto.js`, `shader.js`, `particles.js`, `weather.js`, `main.js`)로 완전히 분할하여 가독성과 유지보수성을 극대화했습니다.
+  - **로컬 실행 환경 보존**: 모듈 로더나 번들러 없이 전통적인 순차 스크립트 로드 방식을 적용하여, 복잡한 로컬 서버 설치나 빌드 과정 없이 `index.html`을 브라우저에서 직접 더블 클릭(file:// 프로토콜)하는 것만으로 즉시 작동하도록 유지했습니다.
+  - **배포 및 성능**: 다중 리소스를 HTTP/2 병렬 통신으로 다운로드하므로 첫 페이지 성능 저하가 전혀 없으며, 기존 GitHub Actions 배포 자동화 프로세스 설정을 그대로 사용할 수 있습니다.

@@ -32,8 +32,8 @@ Instead of generic gradients or heavy images, it features a high-performance **T
 * This allows sharing cards as **short URLs of about 50 characters** without requiring any database storage.
 
 ### 4. Robust Object-Oriented (OOP) Architecture
-* **Single-File Class Structure**: No complex build systems or bundlers are required. The entire code runs within `app.js`, ensuring it can run offline instantly (via `file://`).
-* **Extensibility**: The codebase strictly adheres to the Single Responsibility Principle (SRP). It features an encapsulated `I18nManager` for multi-language support, an `EntranceEffectManager` implementing the Strategy Pattern for visual effects, and an `EditorController` controlling the UI lifecycle, making it highly maintainable and extensible.
+* **No-Build File Splitting Structure**: No complex build tools or local web servers are required. The modular source files in the `js/` directory are loaded sequentially, preserving the ability to run offline instantly (via `file://` by double-clicking `index.html`).
+* **Extensibility**: The codebase strictly adheres to the Single Responsibility Principle (SRP). It features an encapsulated `I18nManager` for multi-language support, an `EntranceEffectFactory` implementing the Strategy Pattern for visual effects, and `EditorController`/`ViewController` classes controlling the UI lifecycles, making it highly maintainable and extensible.
 
 ---
 
@@ -75,7 +75,15 @@ FancyTextShare/
 ├── .github/
 │   └── workflows/
 │       └── static.yml    # GitHub Pages Actions automation
-├── app.js                # Core logic for Three.js shader control and link compression
+├── js/                   # Modular JavaScript files split by responsibility
+│   ├── config.js         # Configuration data and theme list definition
+│   ├── i18n.js           # Multi-language translations manager (I18nManager)
+│   ├── effects.js        # Text entrance animation strategy classes
+│   ├── crypto.js         # Encryption engine for sharing hash encoding/decoding (CryptoEngine)
+│   ├── shader.js         # Three.js background shader renderer (BackgroundShader)
+│   ├── particles.js      # Three.js particle effect renderer (WebGLParticles)
+│   ├── weather.js        # Live weather fetch and mapping manager (WeatherManager)
+│   └── main.js           # Editor/Viewer controllers and DOM entry point
 ├── index.html            # Main markup with semantic structure and SEO optimization
 ├── README.md             # Project introduction document (Korean)
 └── style.css             # Glassmorphism styling and modern UI CSS
@@ -101,3 +109,7 @@ This project requires absolutely no setup or build steps!
   - **Real-time Weather Particles**: Overlays fast-falling rain particles for rainy weather, and swaying snowflake particles for snowy weather on top of the WebGL canvas.
   - **Time-of-day Adaptive Background**: Detects the current hour (`new Date().getHours()`) and dynamically maps matching shaders (Morning, Sunset, Dawn, Starry Night) corresponding to day, night, or twilight.
   - **Creator Preview Support & Memory Caching (WYSIWYG)**: Refactored the weather logic to allow the creator (Editor Mode) to also view real-time local weather in their preview area. Additionally, cached the fetched weather code (`cachedCode`) in memory to ensure instant theme rendering when switching back and forth between themes without geolocation or API delays.
+* **Codebase Modularization & Refactoring**
+  - **Monolithic to Modular**: Split the single ~1,300-line `app.js` file into 8 dedicated files in the `js/` directory (`config.js`, `i18n.js`, `effects.js`, `crypto.js`, `shader.js`, `particles.js`, `weather.js`, `main.js`) based on specific responsibilities to maximize readability and maintainability.
+  - **Preserved Offline Execution**: Retained a sequential script-loading method instead of CORS-restricted modules, ensuring that double-clicking `index.html` (via `file://` protocol) works out-of-the-box locally without needing any build tools or web servers.
+  - **Performance & Deployment**: Leveraged HTTP/2 parallel downloads for script resources so there is no performance penalty, and kept compatibility with the existing GitHub Actions deployment workflow without any changes.
