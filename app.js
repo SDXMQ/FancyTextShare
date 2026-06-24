@@ -837,6 +837,103 @@ class WebGLParticles {
 
 
 /* ============================================================
+   6.5. WeatherManager (Live Weather Helpers)
+   ============================================================ */
+const WeatherManager = {
+  cachedCode: null,
+
+  init(shader, particles) {
+    if (this.cachedCode !== null) {
+      this.applyWeatherMapping(this.cachedCode, shader, particles);
+      return;
+    }
+
+    // Start with morning theme as a placeholder while resolving
+    shader.setTheme(2);
+    particles.setMode('none');
+
+    const hasConsent = localStorage.getItem('fts-location-consent') === 'true';
+    if (hasConsent) {
+      this.requestGeolocationAndApply(shader, particles);
+    } else {
+      this.showConsentModal(shader, particles);
+    }
+  },
+
+  showConsentModal(shader, particles) {
+    const modal = document.getElementById('location-consent-modal');
+    if (!modal) { return; }
+    modal.classList.remove('hidden');
+
+    const allowBtn = document.getElementById('consent-allow');
+    const denyBtn = document.getElementById('consent-deny');
+
+    // Clone buttons to clear existing listeners
+    const newAllowBtn = allowBtn.cloneNode(true);
+    const newDenyBtn = denyBtn.cloneNode(true);
+    allowBtn.parentNode.replaceChild(newAllowBtn, allowBtn);
+    denyBtn.parentNode.replaceChild(newDenyBtn, denyBtn);
+
+    newAllowBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      localStorage.setItem('fts-location-consent', 'true');
+      this.requestGeolocationAndApply(shader, particles);
+    }, { once: true });
+
+    newDenyBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+    }, { once: true });
+  },
+
+  requestGeolocationAndApply(shader, particles) {
+    if (!navigator.geolocation) { return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => this.fetchWeather(pos.coords.latitude, pos.coords.longitude, shader, particles),
+      () => { /* keep default */ }
+    );
+  },
+
+  async fetchWeather(lat, lon, shader, particles) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      this.cachedCode = data.current.weather_code;
+      this.applyWeatherMapping(this.cachedCode, shader, particles);
+    } catch { /* keep default */ }
+  },
+
+  applyWeatherMapping(code, shader, particles) {
+    const hour = new Date().getHours();
+    const isNight = hour >= 21 || hour < 6;
+    const isTwilight = (hour >= 6 && hour < 8) || (hour >= 18 && hour < 21);
+
+    // WMO Weather Code × Time of Day → shader theme + particle mode
+    let shaderTheme, particleMode;
+    if (code === 0) {
+      shaderTheme = isNight ? 0 : isTwilight ? 3 : 2;  // starryNight / sunset / morning
+      particleMode = 'sparkle';
+    } else if (code <= 3) {
+      shaderTheme = isNight ? 0 : isTwilight ? 1 : 2;  // starryNight / dawn / morning
+      particleMode = 'none';
+    } else if (code <= 48) {
+      shaderTheme = 4; particleMode = 'none';           // aurora
+    } else if (code <= 67 || (code >= 80 && code <= 82) || code >= 95) {
+      shaderTheme = 5; particleMode = 'rain';           // deepSea + rain
+    } else if (code >= 71 && code <= 86) {
+      shaderTheme = 0; particleMode = 'snow';           // starryNight + snow
+    } else {
+      shaderTheme = isNight ? 0 : 2; particleMode = 'none';
+    }
+
+    shader.setTheme(shaderTheme);
+    particles.setMode(particleMode);
+  }
+};
+
+
+/* ============================================================
    7. ViewController (Viewer Mode)
    ============================================================ */
 class ViewController {
@@ -868,7 +965,7 @@ class ViewController {
 
     // Weather theme (index 6) needs async location/weather resolution
     if (this.state.theme === 6) {
-      this.initWeatherTheme();
+      WeatherManager.init(this.shader, this.particles);
     } else {
       this.setupGraphics();
     }
@@ -906,85 +1003,7 @@ class ViewController {
     });
   }
 
-  /* --- Weather Theme Flow --- */
-  initWeatherTheme() {
-    // Start with a calm default background while resolving weather
-    this.setupGraphics(2, 'none'); // morning shader as placeholder
 
-    const hasConsent = localStorage.getItem('fts-location-consent') === 'true';
-    if (hasConsent) {
-      this.requestGeolocationAndApply();
-    } else {
-      this.showConsentModal();
-    }
-  }
-
-  showConsentModal() {
-    const modal = document.getElementById('location-consent-modal');
-    if (!modal) { return; }
-    modal.classList.remove('hidden');
-
-    document.getElementById('consent-allow').addEventListener('click', () => {
-      modal.classList.add('hidden');
-      localStorage.setItem('fts-location-consent', 'true');
-      this.requestGeolocationAndApply();
-    }, { once: true });
-
-    document.getElementById('consent-deny').addEventListener('click', () => {
-      modal.classList.add('hidden');
-      // Stay on the default placeholder theme — no further action
-    }, { once: true });
-  }
-
-  requestGeolocationAndApply() {
-    if (!navigator.geolocation) { return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => this.fetchWeather(pos.coords.latitude, pos.coords.longitude),
-      () => { /* permission denied or error — keep default theme */ }
-    );
-  }
-
-  async fetchWeather(lat, lon) {
-    try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code`;
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const data = await res.json();
-      this.applyWeatherMapping(data.current.weather_code);
-    } catch { /* network error — keep default theme */ }
-  }
-
-  applyWeatherMapping(code) {
-    const hour = new Date().getHours();
-    const isNight = hour >= 21 || hour < 6;
-    const isTwilight = (hour >= 6 && hour < 8) || (hour >= 18 && hour < 21);
-
-    // WMO Weather Code × Time of Day → shader theme + particle mode
-    let shaderTheme, particleMode;
-    if (code === 0) {
-      // Clear sky
-      shaderTheme = isNight ? 0 : isTwilight ? 3 : 2;  // starryNight / sunset / morning
-      particleMode = 'sparkle';
-    } else if (code <= 3) {
-      // Partly cloudy / overcast
-      shaderTheme = isNight ? 0 : isTwilight ? 1 : 2;  // starryNight / dawn / morning
-      particleMode = 'none';
-    } else if (code <= 48) {
-      // Fog
-      shaderTheme = 4; particleMode = 'none';           // aurora
-    } else if (code <= 67 || (code >= 80 && code <= 82) || code >= 95) {
-      // Rain / drizzle / thunderstorm
-      shaderTheme = 5; particleMode = 'rain';           // deepSea + rain
-    } else if (code >= 71 && code <= 86) {
-      // Snow / snow showers
-      shaderTheme = 0; particleMode = 'snow';           // starryNight + snow
-    } else {
-      shaderTheme = isNight ? 0 : 2; particleMode = 'none';
-    }
-
-    this.shader.setTheme(shaderTheme);
-    this.particles.setMode(particleMode);
-  }
 
   bindEvents() {
     if (this.replayBtn) {
@@ -1180,12 +1199,18 @@ class EditorController {
 
   setTheme(index) {
     this.state.theme = index;
-    // Weather theme (6) has no dedicated shader — show morning(2) as editor preview
-    this.shader.setTheme(index === 6 ? 2 : index);
     
     // Update active button state
     this.ui.themeSelector.querySelector('.active')?.classList.remove('active');
     this.ui.themeSelector.querySelectorAll('.theme-btn')[index]?.classList.add('active');
+
+    if (index === 6) {
+      WeatherManager.init(this.shader, this.particles);
+    } else {
+      this.shader.setTheme(index);
+      // Restore default persistent particle effect for other themes
+      this.particles.setMode(this.state.persistEffect);
+    }
 
     if (!this.state.isUserModified) {
       this.state.text = Config.THEMES[index].defaultText[this.i18n.lang];

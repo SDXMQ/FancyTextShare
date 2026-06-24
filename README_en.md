@@ -100,3 +100,4 @@ This project requires absolutely no setup or build steps!
   - **Open-Meteo API Integration**: Fetches weather data using the receiver's coordinates without needing an API key.
   - **Real-time Weather Particles**: Overlays fast-falling rain particles for rainy weather, and swaying snowflake particles for snowy weather on top of the WebGL canvas.
   - **Time-of-day Adaptive Background**: Detects the current hour (`new Date().getHours()`) and dynamically maps matching shaders (Morning, Sunset, Dawn, Starry Night) corresponding to day, night, or twilight.
+  - **Creator Preview Support & Memory Caching (WYSIWYG)**: Refactored the weather logic to allow the creator (Editor Mode) to also view real-time local weather in their preview area. Additionally, cached the fetched weather code (`cachedCode`) in memory to ensure instant theme rendering when switching back and forth between themes without geolocation or API delays.
