@@ -59,6 +59,14 @@ const Config = {
       previewGradient: 'linear-gradient(135deg, #000428, #004e92)',
       particles: 'bubbles',
       defaultText: { ko: '깊은 심해 속 고요히 흐르는 생각', en: 'Thoughts quietly flowing in the deep sea' }
+    },
+    {
+      id: 'realtimeWeather',
+      label: { ko: '현재날씨 🌦️', en: 'Live Weather 🌦️' },
+      bgGradient: ['#3a7bd5', '#3a6073'],
+      previewGradient: 'linear-gradient(135deg, #3a7bd5, #00d2ff)',
+      particles: 'weather',
+      defaultText: { ko: '오늘 그대 곁의 하늘은 어떤가요', en: 'How is the sky beside you today' }
     }
   ],
   I18N: {
@@ -90,7 +98,11 @@ const Config = {
       'section-persist': '지속 효과',
       'persist-none': '없음',
       'persist-fireworks': '폭죽',
-      'persist-sparkle': '반짝이'
+      'persist-sparkle': '반짝이',
+      'consent-title': '위치 정보 사용 안내',
+      'consent-body': '이 카드는 당신이 있는 곳의 실시간 날씨를 배경에 반영합니다. 위치 정보 사용을 허용해 주시겠어요?',
+      'consent-allow': '허용할게요',
+      'consent-deny': '괜찮아요'
     },
     en: {
       'subtitle': 'Add emotion to your text and share it with a single link.',
@@ -120,7 +132,11 @@ const Config = {
       'section-persist': 'Persistent Effect',
       'persist-none': 'None',
       'persist-fireworks': 'Fireworks',
-      'persist-sparkle': 'Sparkle'
+      'persist-sparkle': 'Sparkle',
+      'consent-title': 'Location Access',
+      'consent-body': 'This card reflects the live weather at your location. Would you allow location access?',
+      'consent-allow': 'Allow',
+      'consent-deny': 'No thanks'
     }
   }
 };
@@ -705,6 +721,8 @@ class WebGLParticles {
   update(dt, time) {
     if (this.mode === 'fireworks') this.updateFireworks(dt, time);
     else if (this.mode === 'sparkle') this.updateSparkle(dt);
+    else if (this.mode === 'rain') this.updateRain(dt);
+    else if (this.mode === 'snow') this.updateSnow(dt);
   }
 
   updateFireworks(dt, time) {
@@ -747,6 +765,38 @@ class WebGLParticles {
       this.spawn({ type: 'sparkle', x: Math.random() * this.w, y: Math.random() * this.h, vx: 0, vy: 0, life: 1.5 + Math.random() * 2, maxLife: 3.5, r: col[0], g: col[1], b: col[2], size: 10 + Math.random() * 18 });
     }
     for (let i = 0; i < this.MAX; i++) { const p = this.pool[i]; if (p.active) { p.life -= dt; if (p.life <= 0) p.active = false; } }
+  }
+
+  updateRain(dt) {
+    const active = this.pool.filter(p => p.active).length;
+    const target = 120;
+    if (active < target) {
+      const count = Math.min(3, target - active);
+      for (let j = 0; j < count; j++) {
+        this.spawn({ type: 'rain', x: Math.random() * this.w, y: this.h + Math.random() * 40, vx: -this.w * 0.02, vy: -(this.h * (0.8 + Math.random() * 0.5)), life: 3, maxLife: 3, r: 0.6, g: 0.75, b: 1.0, size: 2 + Math.random() * 2 });
+      }
+    }
+    for (let i = 0; i < this.MAX; i++) {
+      const p = this.pool[i]; if (!p.active) continue;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.y < -10) { p.active = false; continue; }
+      p.life -= dt; if (p.life <= 0) p.active = false;
+    }
+  }
+
+  updateSnow(dt) {
+    const active = this.pool.filter(p => p.active).length;
+    const target = 80;
+    if (active < target && Math.random() < 0.3) {
+      this.spawn({ type: 'snow', x: Math.random() * this.w, y: this.h + 10, vx: 0, vy: -(this.h * (0.06 + Math.random() * 0.06)), life: 12, maxLife: 12, r: 1, g: 1, b: 1, size: 3 + Math.random() * 5, phase: Math.random() * Math.PI * 2 });
+    }
+    for (let i = 0; i < this.MAX; i++) {
+      const p = this.pool[i]; if (!p.active) continue;
+      p.x += Math.sin(performance.now() * 0.001 + (p.phase || 0)) * 0.3;
+      p.y += p.vy * dt;
+      if (p.y < -10) { p.active = false; continue; }
+      p.life -= dt; if (p.life <= 0) p.active = false;
+    }
   }
 
   render() {
@@ -814,8 +864,14 @@ class ViewController {
     document.querySelector('.update-selector')?.classList.add('hidden');
 
     this.renderText();
-    this.setupGraphics();
     this.bindEvents();
+
+    // Weather theme (index 6) needs async location/weather resolution
+    if (this.state.theme === 6) {
+      this.initWeatherTheme();
+    } else {
+      this.setupGraphics();
+    }
   }
 
   renderText() {
@@ -836,18 +892,98 @@ class ViewController {
     effect.apply(this.textEl, this.state.text || '');
   }
 
-  setupGraphics() {
-    this.shader.setTheme(this.state.theme || 0);
+  setupGraphics(themeOverride, particleOverride) {
+    this.shader.setTheme(themeOverride !== undefined ? themeOverride : (this.state.theme || 0));
     this.shader.setVignette(this.state.vignette !== undefined ? this.state.vignette : false);
     this.shader.start();
 
-    this.particles.setMode(this.state.persistEffect || 'none');
+    this.particles.setMode(particleOverride || this.state.persistEffect || 'none');
     this.particles.start();
 
     window.addEventListener('resize', () => { 
       this.shader.resize(); 
       this.particles.resize(); 
     });
+  }
+
+  /* --- Weather Theme Flow --- */
+  initWeatherTheme() {
+    // Start with a calm default background while resolving weather
+    this.setupGraphics(2, 'none'); // morning shader as placeholder
+
+    const hasConsent = localStorage.getItem('fts-location-consent') === 'true';
+    if (hasConsent) {
+      this.requestGeolocationAndApply();
+    } else {
+      this.showConsentModal();
+    }
+  }
+
+  showConsentModal() {
+    const modal = document.getElementById('location-consent-modal');
+    if (!modal) { return; }
+    modal.classList.remove('hidden');
+
+    document.getElementById('consent-allow').addEventListener('click', () => {
+      modal.classList.add('hidden');
+      localStorage.setItem('fts-location-consent', 'true');
+      this.requestGeolocationAndApply();
+    }, { once: true });
+
+    document.getElementById('consent-deny').addEventListener('click', () => {
+      modal.classList.add('hidden');
+      // Stay on the default placeholder theme — no further action
+    }, { once: true });
+  }
+
+  requestGeolocationAndApply() {
+    if (!navigator.geolocation) { return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => this.fetchWeather(pos.coords.latitude, pos.coords.longitude),
+      () => { /* permission denied or error — keep default theme */ }
+    );
+  }
+
+  async fetchWeather(lat, lon) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      this.applyWeatherMapping(data.current.weather_code);
+    } catch { /* network error — keep default theme */ }
+  }
+
+  applyWeatherMapping(code) {
+    const hour = new Date().getHours();
+    const isNight = hour >= 21 || hour < 6;
+    const isTwilight = (hour >= 6 && hour < 8) || (hour >= 18 && hour < 21);
+
+    // WMO Weather Code × Time of Day → shader theme + particle mode
+    let shaderTheme, particleMode;
+    if (code === 0) {
+      // Clear sky
+      shaderTheme = isNight ? 0 : isTwilight ? 3 : 2;  // starryNight / sunset / morning
+      particleMode = 'sparkle';
+    } else if (code <= 3) {
+      // Partly cloudy / overcast
+      shaderTheme = isNight ? 0 : isTwilight ? 1 : 2;  // starryNight / dawn / morning
+      particleMode = 'none';
+    } else if (code <= 48) {
+      // Fog
+      shaderTheme = 4; particleMode = 'none';           // aurora
+    } else if (code <= 67 || (code >= 80 && code <= 82) || code >= 95) {
+      // Rain / drizzle / thunderstorm
+      shaderTheme = 5; particleMode = 'rain';           // deepSea + rain
+    } else if (code >= 71 && code <= 86) {
+      // Snow / snow showers
+      shaderTheme = 0; particleMode = 'snow';           // starryNight + snow
+    } else {
+      shaderTheme = isNight ? 0 : 2; particleMode = 'none';
+    }
+
+    this.shader.setTheme(shaderTheme);
+    this.particles.setMode(particleMode);
   }
 
   bindEvents() {
@@ -1044,7 +1180,8 @@ class EditorController {
 
   setTheme(index) {
     this.state.theme = index;
-    this.shader.setTheme(index);
+    // Weather theme (6) has no dedicated shader — show morning(2) as editor preview
+    this.shader.setTheme(index === 6 ? 2 : index);
     
     // Update active button state
     this.ui.themeSelector.querySelector('.active')?.classList.remove('active');

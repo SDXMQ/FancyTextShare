@@ -210,6 +210,20 @@
     </a>
   </div>
 
+  <!-- Location Consent Modal (Weather Theme) -->
+  <div id="location-consent-modal" class="consent-modal hidden">
+    <div class="consent-modal-backdrop"></div>
+    <div class="consent-modal-content">
+      <div class="consent-icon"><i class="fa-solid fa-location-dot"></i></div>
+      <h3 data-i18n="consent-title">위치 정보 사용 안내</h3>
+      <p data-i18n="consent-body">이 카드는 당신이 있는 곳의 실시간 날씨를 배경에 반영합니다. 위치 정보 사용을 허용해 주시겠어요?</p>
+      <div class="consent-buttons">
+        <button type="button" id="consent-allow" class="btn btn-primary" data-i18n="consent-allow">허용할게요</button>
+        <button type="button" id="consent-deny" class="btn btn-ghost" data-i18n="consent-deny">괜찮아요</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Three.js for WebGL Shaders -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="app.js"></script>
