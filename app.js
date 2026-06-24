@@ -285,7 +285,10 @@ const CryptoEngine = (() => {
   }
 
   function fromBase64Url(str) {
-    const padded = str.replace(/-/g, '+').replace(/_/g, '/');
+    let padded = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (padded.length % 4) {
+      padded += '=';
+    }
     const binary = atob(padded);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -368,6 +371,8 @@ class BackgroundShader {
     this.isFallback = false;
     this.animId = null;
     this.themeIndex = 0;
+    this.lastWidth = 0;
+    this.lastHeight = 0;
 
     try {
       this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: false, antialias: false });
@@ -411,7 +416,9 @@ class BackgroundShader {
       this.w = width;
       this.h = height;
     } else {
-      if (this.canvas.width !== width || this.canvas.height !== height) {
+      if (this.lastWidth !== width || this.lastHeight !== height) {
+        this.lastWidth = width;
+        this.lastHeight = height;
         this.renderer.setSize(width, height, false);
         this.uniforms.uResolution.value.set(this.canvas.width, this.canvas.height);
       }
@@ -437,7 +444,7 @@ class BackgroundShader {
       if (this.isFallback) {
         this.renderFallback();
       } else {
-        this.uniforms.uTime.value = time * 0.001;
+        this.uniforms.uTime.value = (time * 0.001) % 1000.0;
         this.renderer.render(this.scene, this.camera);
       }
       this.animId = requestAnimationFrame(loop);
@@ -463,7 +470,8 @@ class BackgroundShader {
 
   getVertexShader() {
     return `
-      varying vec2 vUv;
+      precision highp float;
+      varying highp vec2 vUv;
       void main() {
         vUv = uv;
         gl_Position = vec4(position, 1.0);
@@ -473,13 +481,14 @@ class BackgroundShader {
 
   getFragmentShader() {
     return `
+      precision highp float;
       uniform float uTime;
       uniform vec2 uResolution;
       uniform int uTheme;
       uniform int uVignette;
-      varying vec2 vUv;
+      varying highp vec2 vUv;
       
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
       float noise(vec2 p) {
         vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
@@ -551,7 +560,7 @@ class BackgroundShader {
       }
 
       void main() {
-        vec2 uv = gl_FragCoord.xy / uResolution.xy;
+        vec2 uv = vUv;
         vec3 color = vec3(0.0);
         if (uTheme == 0) color = starryNight(uv, uTime);
         else if (uTheme == 1) color = dawn(uv, uTime);
@@ -559,7 +568,12 @@ class BackgroundShader {
         else if (uTheme == 3) color = sunset(uv, uTime);
         else if (uTheme == 4) color = aurora(uv, uTime);
         else if (uTheme == 5) color = deepSea(uv, uTime);
-        if (uVignette == 1) color *= smoothstep(0.8, 0.2, distance(uv, vec2(0.5)));
+        if (uVignette == 1) {
+          float aspect = uResolution.x / uResolution.y;
+          vec2 aspectUv = vec2(uv.x * aspect, uv.y);
+          vec2 center = vec2(0.5 * aspect, 0.5);
+          color *= smoothstep(0.8, 0.2, distance(aspectUv, center));
+        }
         gl_FragColor = vec4(color, 1.0);
       }
     `;
